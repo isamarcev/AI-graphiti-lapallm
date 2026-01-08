@@ -1,0 +1,236 @@
+"""
+LLM client wrapper for vLLM server with OpenAI-compatible API.
+Supports structured outputs and fallback to OpenAI API.
+"""
+
+from openai import AsyncOpenAI, OpenAI
+from typing import Optional, Type, TypeVar, Any, Dict, List
+from pydantic import BaseModel
+import json
+import logging
+
+from config.settings import settings
+
+logger = logging.getLogger(__name__)
+
+T = TypeVar('T', bound=BaseModel)
+
+
+class LLMClient:
+    """
+    Wrapper for LLM interactions with vLLM or OpenAI.
+    Provides both async and sync interfaces.
+    """
+
+    def __init__(
+        self,
+        base_url: Optional[str] = None,
+        api_key: Optional[str] = None,
+        model_name: Optional[str] = None,
+        use_openai: bool = False
+    ):
+        """
+        Initialize LLM client.
+
+        Args:
+            base_url: Base URL for vLLM server (e.g., http://localhost:8000/v1)
+            api_key: API key (use "EMPTY" for vLLM, actual key for OpenAI)
+            model_name: Model name to use
+            use_openai: If True, use OpenAI API instead of vLLM
+        """
+        self.base_url = base_url or settings.vllm_base_url
+        self.api_key = api_key or settings.vllm_api_key
+        self.model_name = model_name or settings.vllm_model_name
+        self.use_openai = use_openai or settings.use_openai_fallback
+
+        if self.use_openai and settings.openai_api_key:
+            self.api_key = settings.openai_api_key
+            self.base_url = "https://api.openai.com/v1"
+            self.model_name = "gpt-4o-mini"  # or another OpenAI model
+            logger.info("Using OpenAI API fallback")
+        else:
+            logger.info(f"Using vLLM at {self.base_url} with model {self.model_name}")
+
+        # Initialize async and sync clients
+        self.async_client = AsyncOpenAI(
+            base_url=self.base_url,
+            api_key=self.api_key
+        )
+        self.sync_client = OpenAI(
+            base_url=self.base_url,
+            api_key=self.api_key
+        )
+
+    async def generate_async(
+        self,
+        messages: List[Dict[str, str]],
+        temperature: Optional[float] = None,
+        max_tokens: Optional[int] = None,
+        response_format: Optional[Type[T]] = None,
+        **kwargs
+    ) -> str | T:
+        """
+        Generate a response asynchronously.
+
+        Args:
+            messages: List of message dicts with 'role' and 'content'
+            temperature: Sampling temperature
+            max_tokens: Maximum tokens to generate
+            response_format: Optional Pydantic model for structured output
+            **kwargs: Additional parameters for the API
+
+        Returns:
+            Either a string response or a Pydantic model instance
+        """
+        temperature = temperature or settings.llm_temperature
+        max_tokens = max_tokens or settings.llm_max_tokens
+
+        request_params: Dict[str, Any] = {
+            "model": self.model_name,
+            "messages": messages,
+            "temperature": temperature,
+            "max_tokens": max_tokens,
+            **kwargs
+        }
+
+        # Add structured output if Pydantic model provided
+        if response_format is not None:
+            if self.use_openai:
+                # OpenAI native structured outputs
+                request_params["response_format"] = response_format
+            else:
+                # vLLM structured outputs via JSON schema
+                request_params["response_format"] = {
+                    "type": "json_schema",
+                    "json_schema": {
+                        "name": response_format.__name__,
+                        "schema": response_format.model_json_schema(),
+                        "strict": True
+                    }
+                }
+
+        try:
+            response = await self.async_client.chat.completions.create(**request_params)
+            content = response.choices[0].message.content
+
+            if response_format is not None:
+                # Parse JSON response into Pydantic model
+                try:
+                    parsed = json.loads(content)
+                    return response_format.model_validate(parsed)
+                except (json.JSONDecodeError, ValueError) as e:
+                    logger.error(f"Failed to parse structured output: {e}")
+                    logger.error(f"Raw content: {content}")
+                    # Fallback: try to extract JSON from content
+                    import re
+                    json_match = re.search(r'\{.*\}', content, re.DOTALL)
+                    if json_match:
+                        try:
+                            parsed = json.loads(json_match.group())
+                            return response_format.model_validate(parsed)
+                        except Exception:
+                            pass
+                    raise ValueError(f"Could not parse response into {response_format.__name__}: {content}")
+
+            return content
+
+        except Exception as e:
+            logger.error(f"Error generating response: {e}")
+            raise
+
+    def generate_sync(
+        self,
+        messages: List[Dict[str, str]],
+        temperature: Optional[float] = None,
+        max_tokens: Optional[int] = None,
+        response_format: Optional[Type[T]] = None,
+        **kwargs
+    ) -> str | T:
+        """
+        Generate a response synchronously.
+
+        Args:
+            messages: List of message dicts with 'role' and 'content'
+            temperature: Sampling temperature
+            max_tokens: Maximum tokens to generate
+            response_format: Optional Pydantic model for structured output
+            **kwargs: Additional parameters for the API
+
+        Returns:
+            Either a string response or a Pydantic model instance
+        """
+        temperature = temperature or settings.llm_temperature
+        max_tokens = max_tokens or settings.llm_max_tokens
+
+        request_params: Dict[str, Any] = {
+            "model": self.model_name,
+            "messages": messages,
+            "temperature": temperature,
+            "max_tokens": max_tokens,
+            **kwargs
+        }
+
+        # Add structured output if Pydantic model provided
+        if response_format is not None:
+            if self.use_openai:
+                request_params["response_format"] = response_format
+            else:
+                request_params["response_format"] = {
+                    "type": "json_schema",
+                    "json_schema": {
+                        "name": response_format.__name__,
+                        "schema": response_format.model_json_schema(),
+                        "strict": True
+                    }
+                }
+
+        try:
+            response = self.sync_client.chat.completions.create(**request_params)
+            content = response.choices[0].message.content
+
+            if response_format is not None:
+                try:
+                    parsed = json.loads(content)
+                    return response_format.model_validate(parsed)
+                except (json.JSONDecodeError, ValueError) as e:
+                    logger.error(f"Failed to parse structured output: {e}")
+                    import re
+                    json_match = re.search(r'\{.*\}', content, re.DOTALL)
+                    if json_match:
+                        try:
+                            parsed = json.loads(json_match.group())
+                            return response_format.model_validate(parsed)
+                        except Exception:
+                            pass
+                    raise ValueError(f"Could not parse response into {response_format.__name__}: {content}")
+
+            return content
+
+        except Exception as e:
+            logger.error(f"Error generating response: {e}")
+            raise
+
+    def get_async_client(self) -> AsyncOpenAI:
+        """Get the underlying async OpenAI client."""
+        return self.async_client
+
+    def get_sync_client(self) -> OpenAI:
+        """Get the underlying sync OpenAI client."""
+        return self.sync_client
+
+
+# Global client instance
+_llm_client: Optional[LLMClient] = None
+
+
+def get_llm_client() -> LLMClient:
+    """Get or create the global LLM client instance."""
+    global _llm_client
+    if _llm_client is None:
+        _llm_client = LLMClient()
+    return _llm_client
+
+
+def create_llm_client(**kwargs) -> LLMClient:
+    """Create a new LLM client with custom parameters."""
+    return LLMClient(**kwargs)

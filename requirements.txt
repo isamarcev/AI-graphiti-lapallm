@@ -1,0 +1,34 @@
+# LLM & AI Libraries
+openai>=1.10.0
+graphiti-core>=0.25.3
+
+# LangChain & LangGraph
+langchain>=0.1.0
+langchain-core>=0.1.0
+langchain-community>=0.0.20
+langgraph>=0.0.40
+langgraph-checkpoint>=0.0.5
+langsmith>=0.1.0
+
+# Graph Database
+neo4j>=5.14.0
+
+# Embeddings
+sentence-transformers>=2.2.0
+
+# Data validation
+pydantic>=2.5.0
+pydantic-settings>=2.1.0
+
+# Utilities
+python-dotenv>=1.0.0
+httpx>=0.25.0
+
+# Jupyter for demo
+jupyter>=1.0.0
+ipykernel>=6.25.0
+matplotlib>=3.7.0
+pandas>=2.0.0
+
+# Optional: for Neo4j visualization
+py2neo>=2021.2.3
