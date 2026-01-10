@@ -90,15 +90,28 @@ jupyter lab demo_flow.ipynb
 
 ### Verification Commands
 ```bash
-# Check vLLM server
-curl http://localhost:8000/v1/models
-curl http://localhost:8000/health
-
 # Check Neo4j (via browser at http://localhost:7474)
 # Login: neo4j / password123
+docker-compose ps
 
-# Test Python components
-python -c "from clients.llm_client import get_llm_client; print('LLM client OK')"
+# Test hosted API connection (optional)
+python -c "
+import asyncio
+from openai import AsyncOpenAI
+
+async def test():
+    client = AsyncOpenAI(
+        api_key='your-api-key',
+        base_url='http://146.59.127.106:4000'
+    )
+    response = await client.chat.completions.create(
+        model='lapa',
+        messages=[{'role': 'user', 'content': 'Привіт!'}]
+    )
+    print('✅ Hosted API works!')
+
+asyncio.run(test())
+"
 ```
 
 ## Architecture
@@ -122,10 +135,14 @@ Graph definition in agent/graph.py defines the edge connections.
 **Important**: For structured outputs with vLLM, requires vLLM 0.8.5+ with JSON mode support. Fallback to OpenAI API available via `USE_OPENAI_FALLBACK=true` in .env.
 
 #### Graphiti Client (clients/graphiti_client.py)
-- Custom embedder using sentence-transformers for Ukrainian support
+- Supports both hosted Qwen embeddings and local sentence-transformers
 - Uses `OpenAIGenericClient` from graphiti-core for vLLM compatibility
 - Async context manager pattern: `async with GraphitiClient() as client:`
 - BGE cross-encoder for reranking search results
+
+**Embedder Selection:**
+- `USE_HOSTED_EMBEDDINGS=true`: Uses hosted text-embedding-qwen API
+- `USE_HOSTED_EMBEDDINGS=false`: Uses local sentence-transformers (paraphrase-multilingual-mpnet-base-v2)
 
 **Critical**: Graphiti requires `build_indices_and_constraints()` on first run to create Neo4j indexes.
 
@@ -197,6 +214,35 @@ result = await agent.ainvoke({
 ```
 
 ## Common Issues
+
+### Hosted API Connection Issues
+If you get connection errors with the hosted API:
+- Verify your API key in `.env` (should start with `sk-`)
+- Check network connectivity to `http://146.59.127.106:4000`
+- Confirm with team administrator that your key is active
+- Try the verification command above to test connection
+
+### Embedding Dimension Mismatch
+If Graphiti fails with vector dimension errors:
+```python
+# Test embeddings dimension
+from openai import AsyncOpenAI
+import asyncio
+
+async def check_dim():
+    client = AsyncOpenAI(
+        api_key='your-key',
+        base_url='http://146.59.127.106:4000'
+    )
+    response = await client.embeddings.create(
+        input='test',
+        model='text-embedding-qwen'
+    )
+    print(f"Dimension: {len(response.data[0].embedding)}")
+
+asyncio.run(check_dim())
+```
+Then update `EMBEDDING_DIMENSION` in `.env` to match and rebuild Neo4j indices.
 
 ### vLLM Structured Output Failures
 If LLM doesn't return valid JSON:
@@ -274,8 +320,10 @@ MATCH ()-[r]->() RETURN count(r) as relationships
 
 ## Notes
 
-- System prompt in Ukrainian (config/settings.py:86)
-- Embedding model supports multilingual (including Ukrainian)
-- Agent uses last N messages for context (configurable via MAX_CONVERSATION_HISTORY)
-- Episodes are saved with timestamp for temporal graph queries
-- Memory isolation by user_id prevents cross-user information leakage
+- **Hosted by default**: Project configured for hosted Lapathon API (no local vLLM needed)
+- **Embeddings**: Uses hosted text-embedding-qwen for faster setup
+- **System prompt**: In Ukrainian (config/settings.py:86)
+- **Context window**: Agent uses last N messages (configurable via MAX_CONVERSATION_HISTORY)
+- **Temporal memory**: Episodes saved with timestamp for temporal graph queries
+- **Privacy**: Memory isolation by user_id prevents cross-user information leakage
+- **Models available**: `lapa` (default), `mamay` (alternative)

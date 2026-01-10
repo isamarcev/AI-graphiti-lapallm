@@ -148,8 +148,14 @@ class GraphitiClient:
         # Важно: передаем только config, НЕ client!
         graphiti_llm = OpenAIGenericClient(config=llm_config)
 
-        # Create custom embedder
-        embedder = CustomEmbedder()
+        # Create embedder (hosted or local)
+        if settings.use_hosted_embeddings:
+            from clients.hosted_embedder import HostedQwenEmbedder
+            logger.info("Using hosted Qwen embeddings")
+            embedder = HostedQwenEmbedder()
+        else:
+            logger.info("Using local sentence-transformers embeddings")
+            embedder = CustomEmbedder()
 
         # Create local reranker (BGE cross-encoder)
         # BGERerankerClient використовує sentence-transformers локально

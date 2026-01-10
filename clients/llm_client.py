@@ -11,6 +11,18 @@ import logging
 
 from config.settings import settings
 
+# Import LangSmith for tracing
+try:
+    from langsmith import traceable
+    from langsmith.run_helpers import get_current_run_tree
+except ImportError:
+    # Fallback if langsmith not installed
+    def traceable(*args, **kwargs):
+        def decorator(func):
+            return func
+        return decorator
+    get_current_run_tree = None
+
 logger = logging.getLogger(__name__)
 
 T = TypeVar('T', bound=BaseModel)
@@ -61,6 +73,7 @@ class LLMClient:
             api_key=self.api_key
         )
 
+    @traceable(name="llm_generate")
     async def generate_async(
         self,
         messages: List[Dict[str, str]],
@@ -112,6 +125,25 @@ class LLMClient:
         try:
             response = await self.async_client.chat.completions.create(**request_params)
             content = response.choices[0].message.content
+
+            # Log token usage for debugging/monitoring
+            if hasattr(response, 'usage') and response.usage:
+                usage_info = {
+                    "prompt_tokens": response.usage.prompt_tokens,
+                    "completion_tokens": response.usage.completion_tokens,
+                    "total_tokens": response.usage.total_tokens
+                }
+                logger.info(f"Token usage: {usage_info}")
+
+                # Add token metadata to LangSmith trace if available
+                if get_current_run_tree:
+                    try:
+                        run_tree = get_current_run_tree()
+                        if run_tree:
+                            run_tree.extra = run_tree.extra or {}
+                            run_tree.extra["usage_metadata"] = usage_info
+                    except Exception as e:
+                        logger.debug(f"Could not add usage metadata to LangSmith: {e}")
 
             if response_format is not None:
                 # Parse JSON response into Pydantic model

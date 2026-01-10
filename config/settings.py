@@ -81,6 +81,10 @@ class Settings(BaseSettings):
         default=768,
         description="Dimension of embedding vectors"
     )
+    use_hosted_embeddings: bool = Field(
+        default=False,
+        description="Use hosted Qwen embeddings instead of local sentence-transformers"
+    )
 
     # Agent Configuration
     agent_system_prompt: str = Field(
