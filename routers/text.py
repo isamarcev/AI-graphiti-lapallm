@@ -1,29 +1,84 @@
 """
-Router for /text endpoint.
+Router для /text endpoint з knowledge-centered agent.
 """
 
 from fastapi import APIRouter, HTTPException
+from datetime import datetime
+import logging
+
 from routers.schemas import TextRequest, TextResponse
+from agent.graph import get_agent_app
+from agent.state import create_initial_state
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 @router.post("/text", response_model=TextResponse)
 async def process_text(request: TextRequest) -> TextResponse:
     """
-    Обробка текстового повідомлення від користувача.
-
+    Обробка повідомлення через knowledge-centered agent.
+    
+    Flow:
+    1. Create initial state з request
+    2. Invoke agent graph (classify → teach/solve branch)
+    3. Return response з references
+    
     Args:
-        request: TextRequest з полями text та uid
-
+        request: TextRequest з полями text, uid, user_id
+    
     Returns:
-        TextResponse з відповіддю агента, посиланнями та reasoning
+        TextResponse з response, references, reasoning
+    
+    Raises:
+        HTTPException: If agent processing fails
     """
-    # TODO: Implement agent logic here
-    # For now, return a placeholder response
-
-    return TextResponse(
-        response=f"Отримано повідомлення: {request.text}",
-        references=[request.uid],
-        reasoning="Placeholder reasoning - логіка агента буде імплементована пізніше"
-    )
+    logger.info(f"Processing text request: uid={request.uid}, user={request.user_id}")
+    logger.debug(f"Message: {request.text[:100]}...")
+    
+    try:
+        # Get agent instance
+        agent = get_agent_app()
+        
+        # Create initial state
+        initial_state = create_initial_state(
+            message_uid=request.uid,
+            message_text=request.text,
+            user_id=request.user_id,
+            timestamp=datetime.now()
+        )
+        
+        logger.debug("Invoking agent graph...")
+        
+        # Invoke graph
+        result = await agent.ainvoke(
+            initial_state,
+            config={"configurable": {"thread_id": request.uid}}
+        )
+        
+        logger.info(f"Agent completed: intent={result.get('intent')}")
+        
+        # Extract response
+        response_text = result.get("response", "")
+        references = result.get("references", [])
+        reasoning = result.get("reasoning")
+        
+        # Validate response
+        if not response_text:
+            logger.error("Agent returned empty response")
+            raise ValueError("Agent returned empty response")
+        
+        logger.info(f"Returning response with {len(references)} references")
+        
+        return TextResponse(
+            response=response_text,
+            references=references,
+            reasoning=reasoning
+        )
+        
+    except Exception as e:
+        logger.error(f"Agent error: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Agent processing error: {str(e)}"
+        )

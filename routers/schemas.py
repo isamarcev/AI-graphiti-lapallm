@@ -11,6 +11,7 @@ class TextRequest(BaseModel):
 
     text: str = Field(..., description="Повідомлення користувача до агента")
     uid: str = Field(..., description="ID цього повідомлення (UUID v4)")
+    user_id: str = Field(default="default_user", description="ID користувача для ізоляції пам'яті")
 
 
 class TextResponse(BaseModel):

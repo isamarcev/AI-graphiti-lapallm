@@ -1,115 +1,80 @@
 """
-State definition for LangGraph agent.
+State definition for knowledge-centered agent.
 Defines the structure of data that flows through the graph.
 """
 
-from typing import TypedDict, Annotated, Sequence, Optional
-from langchain_core.messages import BaseMessage
-from langgraph.graph import add_messages
+from typing import TypedDict, Literal, Optional, List
 from datetime import datetime
 
 
 class AgentState(TypedDict):
     """
-    State for the conversational agent with graph memory.
-
-    This state is passed between nodes in the LangGraph and maintains
-    the conversation context and retrieved memories.
+    State для knowledge-centered agent з teach/solve paths.
+    
+    This state supports bidirectional knowledge flow:
+    - TEACH path: user provides knowledge, agent learns
+    - SOLVE path: agent retrieves and uses knowledge to solve tasks
     """
-
-    # Conversation messages (accumulated over time)
-    messages: Annotated[Sequence[BaseMessage], add_messages]
-
-    # Retrieved context from Graphiti memory
-    retrieved_context: Optional[str]
-
-    # User identification for memory isolation
+    
+    # Input
+    message_uid: str
+    message_text: str
     user_id: str
-
-    # Session identifier for grouping conversations
-    session_id: str
-
-    # Timestamp of current interaction
-    timestamp: Optional[datetime]
-
-    # Intermediate data for processing
-    current_query: Optional[str]
-
-    # Flag to indicate if memory update is needed
-    needs_memory_update: bool
-
-    # Search results from Graphiti (for debugging/inspection)
-    search_results: Optional[list]
-
-    # Number of messages in this conversation
-    message_count: int
+    timestamp: datetime
+    
+    # Classification
+    intent: Optional[Literal["teach", "solve"]]
+    confidence: float
+    
+    # TEACH path
+    extracted_facts: List[dict]  # [{subject, relation, object, confidence}]
+    conflicts: List[dict]  # [{old_msg_uid, new_msg_uid, old_content, new_content, description, score}]
+    conflict_resolved: bool
+    
+    # SOLVE path
+    retrieved_context: List[dict]  # [{content, source_msg_uid, timestamp, score}]
+    react_steps: List[dict]  # [{thought, action, observation}]
+    
+    # Output
+    response: str
+    references: List[str]  # message UIDs
+    reasoning: Optional[str]
 
 
 def create_initial_state(
-    user_id: str,
-    session_id: str,
-    initial_message: Optional[BaseMessage] = None
+    message_uid: str,
+    message_text: str,
+    user_id: str = "default_user",
+    timestamp: Optional[datetime] = None
 ) -> AgentState:
     """
-    Create an initial state for a new conversation.
-
+    Create an initial state for a new message.
+    
     Args:
-        user_id: Unique identifier for the user
-        session_id: Session identifier
-        initial_message: Optional first message to start with
-
+        message_uid: Unique identifier for the message
+        message_text: Content of the message
+        user_id: User identifier
+        timestamp: Optional timestamp (defaults to now)
+    
     Returns:
-        Initial AgentState
+        Initial AgentState with empty values
     """
-    messages = [initial_message] if initial_message else []
-
+    if timestamp is None:
+        timestamp = datetime.now()
+    
     return AgentState(
-        messages=messages,
-        retrieved_context=None,
+        message_uid=message_uid,
+        message_text=message_text,
         user_id=user_id,
-        session_id=session_id,
-        timestamp=datetime.now(),
-        current_query=None,
-        needs_memory_update=False,
-        search_results=None,
-        message_count=len(messages)
+        timestamp=timestamp,
+        intent=None,
+        confidence=0.0,
+        extracted_facts=[],
+        conflicts=[],
+        conflict_resolved=True,
+        retrieved_context=[],
+        react_steps=[],
+        response="",
+        references=[],
+        reasoning=None
     )
-
-
-def get_last_user_message(state: AgentState) -> Optional[str]:
-    """
-    Extract the last user message from state.
-
-    Args:
-        state: Current agent state
-
-    Returns:
-        Content of the last user message, or None
-    """
-    for message in reversed(state["messages"]):
-        if message.type == "human":
-            return message.content
-    return None
-
-
-def get_conversation_history(state: AgentState, limit: Optional[int] = None) -> str:
-    """
-    Format conversation history as a string.
-
-    Args:
-        state: Current agent state
-        limit: Optional limit on number of messages to include
-
-    Returns:
-        Formatted conversation history
-    """
-    messages = state["messages"]
-    if limit:
-        messages = messages[-limit:]
-
-    history_lines = []
-    for msg in messages:
-        role = "User" if msg.type == "human" else "Assistant"
-        history_lines.append(f"{role}: {msg.content}")
-
-    return "\n".join(history_lines)
