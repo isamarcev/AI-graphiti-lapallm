@@ -9,17 +9,19 @@ graph TD;
 	extract_facts(extract_facts)
 	check_conflicts(check_conflicts)
 	resolve_conflict(resolve_conflict)
+	generate_confirmation(generate_confirmation)
 	store_knowledge(store_knowledge)
 	retrieve_context(retrieve_context)
 	react_loop(react_loop)
 	generate_answer(generate_answer)
 	__end__([<p>__end__</p>]):::last
 	__start__ --> classify;
+	check_conflicts -. &nbsp;confirm&nbsp; .-> generate_confirmation;
 	check_conflicts -. &nbsp;resolve&nbsp; .-> resolve_conflict;
-	check_conflicts -. &nbsp;store&nbsp; .-> store_knowledge;
 	classify -. &nbsp;teach&nbsp; .-> extract_facts;
 	classify -. &nbsp;solve&nbsp; .-> retrieve_context;
 	extract_facts --> check_conflicts;
+	generate_confirmation --> store_knowledge;
 	react_loop --> generate_answer;
 	retrieve_context --> react_loop;
 	generate_answer --> __end__;

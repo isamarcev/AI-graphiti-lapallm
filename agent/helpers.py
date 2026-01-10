@@ -105,44 +105,94 @@ async def check_contradiction(
     text1: str,
     text2: str,
     threshold: float = 0.7
-) -> Tuple[bool, float]:
+) -> Tuple[bool, float, str]:
     """
-    Перевіряє чи два тексти суперечать один одному.
-    
+    Перевіряє 5 типів конфліктів між фактами.
+
     Uses LLM для epistemic reasoning про конфлікт.
     Implements knowledge quality assessment - detecting contradictions
-    with confidence scores.
-    
+    with confidence scores and conflict type classification.
+
     Args:
         text1: First text/fact
         text2: Second text/fact
         threshold: Minimum confidence to consider as conflict (default: 0.7)
-    
+
     Returns:
-        Tuple of (is_conflict: bool, confidence: float)
-    
+        Tuple of (is_conflict: bool, confidence: float, conflict_type: str)
+
+    Conflict Types:
+        1. direct - прямі протиріччя (Київ vs Харків)
+        2. temporal - зміна в часі (раніше любив, зараз ні)
+        3. contextual - залежить від контексту (сам vs з друзями)
+        4. degree - різниця в ступені (любить vs обожнює)
+        5. partial - часткове протиріччя (любить каву vs не любить напої)
+
     Examples:
-        "Київ - столиця України", "Харків - столиця України" -> (True, 0.95)
-        "Олег любить каву", "Олег п'є чай" -> (False, 0.3)
+        "Київ - столиця України", "Харків - столиця України" -> (True, 0.95, "direct")
+        "Раніше любив каву", "Зараз не люблю каву" -> (False, 1.0, "temporal")
+        "Олег любить каву", "Олег п'є чай" -> (False, 0.3, "none")
     """
     llm = get_llm_client()
-    
-    prompt = f"""Проаналізуй чи ці два твердження суперечать одне одному.
 
-Твердження 1: {text1}
-Твердження 2: {text2}
+    prompt = f"""Проаналізуй ці два твердження на ВСІХ рівнях конфліктів.
 
-Чи є протиріччя? Відповідь у форматі JSON:
-{{
-  "is_conflict": true або false,
-  "confidence": число від 0.0 до 1.0,
-  "explanation": "коротке пояснення"
-}}
+**Твердження 1:** {text1}
+**Твердження 2:** {text2}
 
-Правила:
-- is_conflict = true тільки якщо твердження напряму суперечать
-- confidence = твоя впевненість у висновку
-- Якщо твердження просто про різні речі - це НЕ конфлікт"""
+**ТИПИ КОНФЛІКТІВ:**
+
+1. **DIRECT** - прямі взаємовиключні факти
+   Приклад: "Київ столиця України" vs "Харків столиця України"
+
+2. **TEMPORAL** - зміна в часі (це OK, НЕ завжди конфлікт!)
+   "Раніше любив каву" vs "Зараз не люблю каву" = НЕ конфлікт (природня зміна)
+   "Любив каву" vs "Ніколи не любив каву" = КОНФЛІКТ (суперечить минулому)
+
+3. **CONTEXTUAL** - залежить від обставин (обидва можуть бути правдою)
+   "Люблю плавати сам" vs "Люблю плавати з друзями" = НЕ конфлікт
+
+4. **DEGREE** - різниця в інтенсивності (уточнення, не конфлікт)
+   "Люблю каву" vs "Обожнюю каву" = НЕ конфлікт (уточнення)
+
+5. **PARTIAL** - одне включає інше
+   "Люблю каву" vs "Не люблю напої" = partial conflict
+
+**FEW-SHOT EXAMPLES:**
+
+Приклад 1:
+Твердження 1: "Київ столиця України"
+Твердження 2: "Харків столиця України"
+→ {{"is_conflict": true, "conflict_type": "direct", "confidence": 1.0, "explanation": "Країна не може мати дві столиці"}}
+
+Приклад 2:
+Твердження 1: "Олег любить плавати сам"
+Твердження 2: "Олег любить плавати з друзями"
+→ {{"is_conflict": false, "conflict_type": "contextual", "confidence": 0.9, "explanation": "Обидва можуть бути правдою в різних контекстах"}}
+
+Приклад 3:
+Твердження 1: "Я веган"
+Твердження 2: "Сьогодні я їв стейк"
+→ {{"is_conflict": true, "conflict_type": "direct", "confidence": 0.95, "explanation": "Веган не їсть м'ясо за визначенням"}}
+
+Приклад 4:
+Твердження 1: "Раніше я працював в Google"
+Твердження 2: "Зараз я не працюю в Google"
+→ {{"is_conflict": false, "conflict_type": "temporal", "confidence": 1.0, "explanation": "Природня зміна в часі, не конфлікт"}}
+
+Приклад 5:
+Твердження 1: "Я завжди працював ТІЛЬКИ в Google"
+Твердження 2: "Раніше я працював в Microsoft"
+→ {{"is_conflict": true, "conflict_type": "direct", "confidence": 0.9, "explanation": "Якщо ЗАВЖДИ тільки Google, то не міг працювати в Microsoft"}}
+
+**ПРАВИЛА:**
+- TEMPORAL changes з явним часом = НЕ конфлікт
+- CONTEXTUAL differences = НЕ конфлікт якщо можуть співіснувати
+- DEGREE differences = НЕ конфлікт якщо уточнення
+- Confidence < 0.7 = не детектуємо як конфлікт
+
+Відповідай JSON:
+{{"is_conflict": bool, "conflict_type": "direct"|"temporal"|"contextual"|"degree"|"partial"|"none", "confidence": 0.0-1.0, "explanation": "чому є/немає конфлікту"}}"""
     
     try:
         response = await llm.generate_async(
@@ -165,26 +215,29 @@ async def check_contradiction(
         result = json.loads(clean_response)
         is_conflict = result.get("is_conflict", False)
         confidence = result.get("confidence", 0.5)
+        conflict_type = result.get("conflict_type", "unknown")
         explanation = result.get("explanation", "")
-        
-        logger.info(f"Contradiction check: {is_conflict} (conf: {confidence:.2f}) - {explanation}")
-        
+
+        logger.info(
+            f"Conflict check: {is_conflict} (type: {conflict_type}, conf: {confidence:.2f}) - {explanation}"
+        )
+
         # Apply threshold - не детектуємо low-confidence conflicts
         if confidence < threshold:
             logger.debug(f"Confidence {confidence} below threshold {threshold}, treating as no conflict")
-            return False, confidence
-        
-        return is_conflict, confidence
+            return False, confidence, conflict_type
+
+        return is_conflict, confidence, conflict_type
         
     except json.JSONDecodeError as e:
         logger.error(f"Failed to parse JSON from LLM response: {e}")
         logger.debug(f"Response was: {response}")
         # Fallback: conservative - не детектуємо конфлікт якщо parse failed
-        return False, 0.0
+        return False, 0.0, "error"
     except Exception as e:
         logger.error(f"Error checking contradiction: {e}", exc_info=True)
         # Fallback: conservative - не детектуємо конфлікт якщо LLM failed
-        return False, 0.0
+        return False, 0.0, "error"
 
 
 def extract_used_sources(text: str) -> set:

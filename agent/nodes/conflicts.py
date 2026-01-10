@@ -68,11 +68,11 @@ async def check_conflicts_node(state: AgentState) -> Dict[str, Any]:
                 if len(old_content.strip()) < 5:
                     continue
                 
-                # Epistemic reasoning про conflict
-                is_conflict, confidence = await check_contradiction(
+                # Epistemic reasoning про conflict (5 типів)
+                is_conflict, confidence, conflict_type = await check_contradiction(
                     fact_text, old_content
                 )
-                
+
                 if is_conflict:
                     # Extract source message UID
                     # Try different fields where episode name might be stored
@@ -91,7 +91,8 @@ async def check_conflicts_node(state: AgentState) -> Dict[str, Any]:
                         "new_msg_uid": state["message_uid"],
                         "old_content": old_content,
                         "new_content": fact_text,
-                        "description": f"Конфлікт між існуючим '{old_content}' та новим '{fact_text}'",
+                        "conflict_type": conflict_type,  # NEW: direct/temporal/contextual/degree/partial
+                        "description": f"Конфлікт ({conflict_type}): '{old_content}' vs '{fact_text}'",
                         "confidence": confidence  # Epistemic metric
                     }
                     
