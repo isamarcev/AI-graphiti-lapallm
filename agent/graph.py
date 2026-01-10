@@ -10,7 +10,8 @@ from agent.state import AgentState
 from agent.nodes.classify import classify_intent_node
 from agent.nodes.extract import extract_facts_node
 from agent.nodes.conflicts import check_conflicts_node
-from agent.nodes.resolve import resolve_conflict_node
+from agent.nodes.auto_resolve import auto_resolve_conflict_node  # Auto-accept new info
+from agent.nodes.resolve import resolve_conflict_node  # Manual resolution (backup)
 from agent.nodes.confirm import generate_confirmation_node
 from agent.nodes.store import store_knowledge_node
 from agent.nodes.retrieve import retrieve_context_node
@@ -40,15 +41,19 @@ def route_by_intent(state: AgentState) -> str:
 def route_conflicts(state: AgentState) -> str:
     """
     Route після check_conflicts node.
+    
+    For Tabula Rasa agent: auto-accept new information (conflicts resolved automatically).
+    Manual resolution kept as backup for critical cases.
 
     Returns:
-        "resolve" if conflicts found, "confirm" otherwise
+        "auto_resolve" if conflicts found (auto-accept new info),
+        "confirm" if no conflicts
     """
     conflicts = state.get("conflicts", [])
 
     if conflicts:
-        logger.info(f"Conflicts found: {len(conflicts)}, routing to resolve")
-        return "resolve"
+        logger.info(f"Conflicts found: {len(conflicts)}, routing to auto-resolve (accept new)")
+        return "auto_resolve"
 
     logger.info("No conflicts, proceeding to generate confirmation")
     return "confirm"
@@ -60,7 +65,8 @@ def create_agent_graph():
 
     Architecture:
     - Entry: classify intent (teach/solve)
-    - TEACH branch: extract facts → check conflicts → [resolve | confirm → store]
+    - TEACH branch: extract facts → check conflicts → [auto_resolve → store | confirm → store]
+      (Tabula Rasa: new info auto-replaces old)
     - SOLVE branch: retrieve context → react loop → generate answer
 
     Implements key concepts from paper (Báez Santamaría, 2024):
@@ -80,7 +86,8 @@ def create_agent_graph():
     workflow.add_node("classify", classify_intent_node)
     workflow.add_node("extract_facts", extract_facts_node)
     workflow.add_node("check_conflicts", check_conflicts_node)
-    workflow.add_node("resolve_conflict", resolve_conflict_node)
+    workflow.add_node("auto_resolve", auto_resolve_conflict_node)  # Auto-accept new info
+    workflow.add_node("resolve_conflict", resolve_conflict_node)  # Manual resolution (backup)
     workflow.add_node("generate_confirmation", generate_confirmation_node)
     workflow.add_node("store_knowledge", store_knowledge_node)
     workflow.add_node("retrieve_context", retrieve_context_node)
@@ -108,14 +115,15 @@ def create_agent_graph():
         "check_conflicts",
         route_conflicts,
         {
-            "resolve": "resolve_conflict",
+            "auto_resolve": "auto_resolve",  # Auto-accept new info (Tabula Rasa)
             "confirm": "generate_confirmation"
         }
     )
     workflow.add_edge("generate_confirmation", "store_knowledge")
-    workflow.add_edge("resolve_conflict", END)  # Bidirectional - wait for user
+    workflow.add_edge("auto_resolve", "store_knowledge")  # Continue after auto-resolve
+    workflow.add_edge("resolve_conflict", END)  # Manual resolution (if needed) - wait for user
     workflow.add_edge("store_knowledge", END)
-    logger.debug("TEACH path configured")
+    logger.debug("TEACH path configured (with auto-resolve)")
     
     # SOLVE path
     workflow.add_edge("retrieve_context", "react_loop")
