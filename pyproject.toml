@@ -1,0 +1,27 @@
+[project]
+name = "graphity-lapa"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "graphiti-core>=0.25.3",
+    "httpx>=0.25.0",
+    "ipykernel>=6.25.0",
+    "jupyter>=1.0.0",
+    "langchain>=0.1.0",
+    "langchain-community>=0.0.20",
+    "langchain-core>=0.1.0",
+    "langgraph>=0.0.40",
+    "langgraph-checkpoint>=0.0.5",
+    "langsmith>=0.1.0",
+    "matplotlib>=3.7.0",
+    "neo4j>=5.14.0",
+    "openai>=1.10.0",
+    "pandas>=2.0.0",
+    "py2neo>=2021.2.3",
+    "pydantic>=2.5.0",
+    "pydantic-settings>=2.1.0",
+    "python-dotenv>=1.0.0",
+    "sentence-transformers>=2.2.0",
+]
