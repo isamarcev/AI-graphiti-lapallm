@@ -5,6 +5,7 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "fastapi>=0.128.0",
     "graphiti-core>=0.25.3",
     "httpx>=0.25.0",
     "ipykernel>=6.25.0",
@@ -24,4 +25,5 @@ dependencies = [
     "pydantic-settings>=2.1.0",
     "python-dotenv>=1.0.0",
     "sentence-transformers>=2.2.0",
+    "uvicorn>=0.27.0",
 ]
