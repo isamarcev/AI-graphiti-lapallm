@@ -11,6 +11,7 @@ from agent.nodes.classify import classify_intent_node
 from agent.nodes.extract import extract_facts_node
 from agent.nodes.conflicts import check_conflicts_node
 from agent.nodes.resolve import resolve_conflict_node
+from agent.nodes.confirm import generate_confirmation_node
 from agent.nodes.store import store_knowledge_node
 from agent.nodes.retrieve import retrieve_context_node
 from agent.nodes.react import react_loop_node
@@ -39,34 +40,34 @@ def route_by_intent(state: AgentState) -> str:
 def route_conflicts(state: AgentState) -> str:
     """
     Route після check_conflicts node.
-    
+
     Returns:
-        "resolve" if conflicts found, "store" otherwise
+        "resolve" if conflicts found, "confirm" otherwise
     """
     conflicts = state.get("conflicts", [])
-    
+
     if conflicts:
         logger.info(f"Conflicts found: {len(conflicts)}, routing to resolve")
         return "resolve"
-    
-    logger.info("No conflicts, proceeding to store")
-    return "store"
+
+    logger.info("No conflicts, proceeding to generate confirmation")
+    return "confirm"
 
 
 def create_agent_graph():
     """
     Create knowledge-centered agent з bidirectional flow.
-    
+
     Architecture:
     - Entry: classify intent (teach/solve)
-    - TEACH branch: extract facts → check conflicts → [resolve | store]
+    - TEACH branch: extract facts → check conflicts → [resolve | confirm → store]
     - SOLVE branch: retrieve context → react loop → generate answer
-    
+
     Implements key concepts from paper (Báez Santamaría, 2024):
     - Bidirectional knowledge flow (agent asks when conflicts detected)
     - Knowledge quality assessment (confidence, conflicts, completeness)
     - Epistemic awareness (reasoning about knowledge state)
-    
+
     Returns:
         Compiled LangGraph application
     """
@@ -80,6 +81,7 @@ def create_agent_graph():
     workflow.add_node("extract_facts", extract_facts_node)
     workflow.add_node("check_conflicts", check_conflicts_node)
     workflow.add_node("resolve_conflict", resolve_conflict_node)
+    workflow.add_node("generate_confirmation", generate_confirmation_node)
     workflow.add_node("store_knowledge", store_knowledge_node)
     workflow.add_node("retrieve_context", retrieve_context_node)
     workflow.add_node("react_loop", react_loop_node)
@@ -107,9 +109,10 @@ def create_agent_graph():
         route_conflicts,
         {
             "resolve": "resolve_conflict",
-            "store": "store_knowledge"
+            "confirm": "generate_confirmation"
         }
     )
+    workflow.add_edge("generate_confirmation", "store_knowledge")
     workflow.add_edge("resolve_conflict", END)  # Bidirectional - wait for user
     workflow.add_edge("store_knowledge", END)
     logger.debug("TEACH path configured")

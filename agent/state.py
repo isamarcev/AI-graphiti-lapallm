@@ -30,6 +30,7 @@ class AgentState(TypedDict):
     extracted_facts: List[dict]  # [{subject, relation, object, confidence}]
     conflicts: List[dict]  # [{old_msg_uid, new_msg_uid, old_content, new_content, description, score}]
     conflict_resolved: bool
+    confirmation_text: Optional[str]  # Generated confirmation message for teaching
     
     # SOLVE path
     retrieved_context: List[dict]  # [{content, source_msg_uid, timestamp, score}]
@@ -72,6 +73,7 @@ def create_initial_state(
         extracted_facts=[],
         conflicts=[],
         conflict_resolved=True,
+        confirmation_text=None,
         retrieved_context=[],
         react_steps=[],
         response="",

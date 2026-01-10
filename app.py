@@ -8,6 +8,10 @@ Run with:
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from routers.text import router as text_router
+from config.logging_config import configure_logging
+
+# Configure logging on startup
+configure_logging(level="INFO")
 
 # Create FastAPI application
 app = FastAPI(

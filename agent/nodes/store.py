@@ -40,9 +40,17 @@ async def store_knowledge_node(state: AgentState) -> Dict[str, Any]:
     try:
         # 1. Add episode to Graphiti
         episode_name = f"teach_{state['message_uid']}"
-        episode_body = state["message_text"]
+
+        # Format episode as a proper conversation
+        # This is critical for Graphiti's LLM to parse correctly
+        user_message = state["message_text"]
+        assistant_message = state.get("confirmation_text") or "Дякую за інформацію. Я її зберіг."
+
+        episode_body = f"""User: {user_message}
+Assistant: {assistant_message}"""
 
         logger.info(f"Adding episode to Graphiti: {episode_name}")
+        logger.debug(f"Episode body:\n{episode_body}")
 
         episode = await graphiti.add_episode(
             episode_body=episode_body,
