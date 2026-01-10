@@ -124,7 +124,16 @@ class LLMClient:
 
         try:
             response = await self.async_client.chat.completions.create(**request_params)
+            print(f"Response: {response}")
             content = response.choices[0].message.content
+
+            # Clean content from invalid UTF-8 surrogate characters
+            if content:
+                try:
+                    content = content.encode('utf-8', errors='ignore').decode('utf-8', errors='ignore')
+                except Exception:
+                    # Fallback: replace known problematic characters
+                    content = content.replace('\udcd1', '').replace('\udcd0', '')
 
             # Log token usage for debugging/monitoring
             if hasattr(response, 'usage') and response.usage:
@@ -219,6 +228,14 @@ class LLMClient:
         try:
             response = self.sync_client.chat.completions.create(**request_params)
             content = response.choices[0].message.content
+
+            # Clean content from invalid UTF-8 surrogate characters
+            if content:
+                try:
+                    content = content.encode('utf-8', errors='ignore').decode('utf-8', errors='ignore')
+                except Exception:
+                    # Fallback: replace known problematic characters
+                    content = content.replace('\udcd1', '').replace('\udcd0', '')
 
             if response_format is not None:
                 try:

@@ -222,6 +222,17 @@ If you get connection errors with the hosted API:
 - Confirm with team administrator that your key is active
 - Try the verification command above to test connection
 
+### UTF-8 Encoding Errors (Surrogate Characters)
+If you see errors like `'utf-8' codec can't encode character '\udcd1'`:
+- This is caused by the hosted API returning invalid surrogate characters
+- **Fixed in code**: All text is automatically cleaned before/after API calls
+- The cleaners remove invalid UTF-8 surrogates: `\udcd0`, `\udcd1`, etc.
+- Affected files:
+  - `clients/hosted_embedder.py` - cleans text before embedding
+  - `clients/llm_client.py` - cleans responses after generation
+  - `demochat.py` - cleans user input and agent responses
+- If you still see issues, try rephrasing your input
+
 ### Embedding Dimension Mismatch
 If Graphiti fails with vector dimension errors:
 ```python

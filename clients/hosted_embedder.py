@@ -55,6 +55,15 @@ class HostedQwenEmbedder(EmbedderClient):
         # Will be determined on first call
         self.dimension = None
 
+    def _clean_text(self, text: str) -> str:
+        """Clean text from invalid UTF-8 surrogate characters."""
+        try:
+            # Remove surrogate characters that cause encoding errors
+            return text.encode('utf-8', errors='ignore').decode('utf-8', errors='ignore')
+        except Exception:
+            # Fallback: replace problematic characters
+            return text.replace('\udcd1', '').replace('\udcd0', '')
+
     async def create(self, input_data: str | List[str]) -> List[float]:
         """
         Create embedding for a SINGLE text.
@@ -72,6 +81,9 @@ class HostedQwenEmbedder(EmbedderClient):
             text = input_data[0]
         else:
             text = input_data
+
+        # Clean text from invalid UTF-8 characters
+        text = self._clean_text(text)
 
         try:
             response = await self.client.embeddings.create(
@@ -106,11 +118,14 @@ class HostedQwenEmbedder(EmbedderClient):
         if not input_data_list:
             return []
 
+        # Clean all texts from invalid UTF-8 characters
+        cleaned_texts = [self._clean_text(text) for text in input_data_list]
+
         try:
             # The API might support batch requests
             # If it does, this is more efficient
             response = await self.client.embeddings.create(
-                input=input_data_list,
+                input=cleaned_texts,
                 model=self.model_name,
                 encoding_format="float"
             )

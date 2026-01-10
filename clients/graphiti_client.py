@@ -17,6 +17,7 @@ from typing import Optional, List
 import logging
 import asyncio
 from datetime import datetime
+from clients.hosted_embedder import HostedQwenEmbedder
 
 from graphiti_core.llm_client.openai_generic_client import OpenAIGenericClient
 from graphiti_core.cross_encoder.bge_reranker_client import BGERerankerClient
@@ -150,7 +151,6 @@ class GraphitiClient:
 
         # Create embedder (hosted or local)
         if settings.use_hosted_embeddings:
-            from clients.hosted_embedder import HostedQwenEmbedder
             logger.info("Using hosted Qwen embeddings")
             embedder = HostedQwenEmbedder()
         else:
