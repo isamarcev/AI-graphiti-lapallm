@@ -455,15 +455,15 @@ agent:
     - "8080:3000"  # Використати інший порт
 ```
 
-**Детальний troubleshooting:** [DOCKER_SETUP.md](DOCKER_SETUP.md)
+**Детальний troubleshooting:** [DOCKER_SETUP.md](docs/DOCKER_SETUP.mdUP.md)
 
 ---
 
 ## 📚 Документація
 
 - **[QUICKSTART.md](QUICKSTART.md)** - швидкий старт за 3 команди
-- **[DOCKER_SETUP.md](DOCKER_SETUP.md)** - детальний Docker setup
-- **[DOCKER_DEPLOYMENT.md](DOCKER_DEPLOYMENT.md)** - production deployment
+- **[DOCKER_SETUP.md](docs/DOCKER_SETUP.mdUP.md)** - детальний Docker setup
+- **[DOCKER_DEPLOYMENT.md](docs/DOCKER_DEPLOYMENT.mdNT.md)** - production deployment
 - **[TABULA_RASA_IMPLEMENTATION.md](TABULA_RASA_IMPLEMENTATION.md)** - імплементація змін
 - **[TABULA_RASA_TESTING.md](TABULA_RASA_TESTING.md)** - testing scenarios
 
@@ -639,7 +639,7 @@ Response includes `references` with source message UIDs.
 ## 📚 Documentation
 
 - **[QUICKSTART.md](QUICKSTART.md)** - 3-command quick start
-- **[DOCKER_SETUP.md](DOCKER_SETUP.md)** - detailed Docker setup
+- **[DOCKER_SETUP.md](docs/DOCKER_SETUP.mdUP.md)** - detailed Docker setup
 - **[TABULA_RASA_TESTING.md](TABULA_RASA_TESTING.md)** - testing scenarios
 
 ---

@@ -53,28 +53,7 @@ from config.settings import settings
 
 ```python
 async def process_node(state: AgentState, param: str) -> Dict[str, Any]:
-    """
-    Brief description in one line.
-    
-    Longer description with context about what this does,
-    why it exists, and how it fits into the system.
-    
-    Args:
-        state: Current agent state with required fields
-        param: Description of parameter
-    
-    Returns:
-        State update dictionary with keys:
-        - key1: description
-        - key2: description
-    
-    Raises:
-        ValueError: When invalid input provided
-    
-    Example:
-        >>> result = await process_node(state, "test")
-        >>> assert "key1" in result
-    """
+    """Brief description in one line. """
 ```
 
 ## 🔒 Type Safety Rules
