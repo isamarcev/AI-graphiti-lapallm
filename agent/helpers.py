@@ -242,30 +242,35 @@ async def check_contradiction(
 
 def extract_used_sources(text: str) -> set:
     """
-    Витягує номери використаних джерел з тексту відповіді.
+    DEPRECATED: Use extract_message_uids_from_text instead.
     
-    Шукає patterns типу [Джерело N] в тексті.
+    Old function that extracted numeric indices.
+    Kept for backward compatibility.
+    """
+    logger.warning("extract_used_sources is deprecated, use extract_message_uids_from_text")
+    return set()
+
+
+def extract_message_uids_from_text(text: str) -> set:
+    """
+    Витягує message UIDs використаних джерел з тексту відповіді.
+    
+    Шукає patterns типу [msg-XXX] або [test-msg-XXX] в тексті.
     
     Args:
         text: Response text containing source references
     
     Returns:
-        Set of source indices used in the text
+        Set of message UIDs used in the text
     
     Example:
-        "Київ [Джерело 0] це столиця [Джерело 1]" -> {0, 1}
+        "Київ [msg-001] це столиця [msg-002]" -> {"msg-001", "msg-002"}
+        "Харків [test-msg-005]" -> {"test-msg-005"}
     """
-    source_pattern = r'\[Джерело (\d+)\]'
-    matches = re.findall(source_pattern, text)
+    # Pattern для message UIDs: [msg-XXX] або [test-msg-XXX] або [UUID]
+    uid_pattern = r'\[((?:test-)?msg-\d+|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\]'
+    matches = re.findall(uid_pattern, text, re.IGNORECASE)
     
-    used_sources = set()
-    for match in matches:
-        try:
-            idx = int(match)
-            used_sources.add(idx)
-        except ValueError:
-            logger.warning(f"Invalid source index: {match}")
-            continue
-    
-    logger.debug(f"Extracted {len(used_sources)} source references from text")
-    return used_sources
+    used_uids = set(matches)
+    logger.debug(f"Extracted {len(used_uids)} message UID references from text: {used_uids}")
+    return used_uids
