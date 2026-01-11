@@ -1,442 +1,700 @@
-# Graphiti + LangGraph + Lapa LLM Demo
+# Tabula Rasa Agent - Knowledge-Centered Conversational AI
 
-Демонстрационный проект AI агента с долговременной памятью для хакатона **Tabula Rasa: Agent Genesis**.
+Проєкт AI агента з довготривалою пам'яттю для хакатону **Tabula Rasa: Agent Genesis**.
 
-## 🎯 Обзор проекта
-
-Этот проект демонстрирует интеграцию трех ключевых технологий:
-
-- **Lapa LLM** - украинская языковая модель на базе Gemma 12B
-- **Graphiti** - временно-ориентированный граф знаний для хранения памяти агента
-- **LangGraph** - фреймворк для построения агентов с состоянием
-
-### Ключевые возможности
-
-✨ **Долговременная память** - агент запоминает факты из предыдущих разговоров
-🧠 **Графовое хранение** - связи между сущностями и концепциями
-🇺🇦 **Украинский язык** - оптимизированная модель для украинского
-🔍 **Гибридный поиск** - семантический + BM25 + обход графа
-⏱️ **Темпоральность** - отслеживание времени событий
+[English version below](#english-version)
 
 ---
 
-## 🏗️ Архитектура
+## 🎯 Огляд проєкту
 
-```
-User Input → LangGraph Agent → Graphiti Memory → Neo4j
-                ↓                     ↑
-            Lapa LLM (vLLM)          |
-                ↓                     |
-            Response ←───────────────┘
-```
+**Tabula Rasa Agent** - це агент з нульовими знаннями про предметну область, який навчається виключно від користувача через діалог.
 
-### Поток обработки:
-1. **retrieve_memory** - поиск релевантного контекста в графе
-2. **generate_response** - генерация ответа с учетом контекста
-3. **save_to_memory** - сохранение нового эпизода в граф
+### Ключові технології
 
----
+- **Lapa LLM** - українська мовна модель на базі Gemma 12B
+- **Graphiti** - темпоральний граф знань для зберігання пам'яті агента
+- **LangGraph** - фреймворк для побудови агентів зі станом
+- **Neo4j** - графова база даних для knowledge + message references
+- **FastAPI** - REST API endpoints
 
-## 📦 Требования
+### Ключові можливості
 
-### Системные требования
-- Python 3.10+
-- Docker и Docker Compose
-- 16GB+ RAM (для работы с 12B моделью)
-- GPU рекомендуется (но не обязателен)
-
-### Сервисы
-- Neo4j 5.26+
-- vLLM или Ollama для запуска Lapa LLM
+✨ **Tabula Rasa** - агент починає з нульовими знаннями про домен  
+🧠 **Графове зберігання** - зв'язки між сутностями та концептами  
+🇺🇦 **Українська мова** - оптимізована модель для української  
+🔍 **Гібридний пошук** - семантичний + BM25 + обхід графу  
+⏱️ **Темпоральність** - відстеження часу подій  
+🔗 **References** - кожна відповідь містить посилання на джерела  
+🔄 **Auto-resolve** - автоматичне оновлення конфліктів (нова інформація замінює стару)  
 
 ---
 
-## 🚀 Быстрый старт
+## 🏗️ Архітектура
 
-### 1. Клонирование и установка зависимостей
+### Bidirectional Knowledge Flow
 
-```bash
-# Перейдите в директорию проекта
-cd /path/to/llm/graphity_lapa
-
-# Создайте виртуальное окружение
-python3 -m venv venv
-source venv/bin/activate  # На Windows: venv\Scripts\activate
-
-# Установите зависимости
-pip install -r requirements.txt
+```
+┌─────────────┐
+│    USER     │
+└──────┬──────┘
+       │
+       ▼
+┌─────────────────────────────────┐
+│   CLASSIFY INTENT               │
+│   (TEACH or SOLVE)              │
+└──────┬──────────────────┬───────┘
+       │                  │
+       │ TEACH            │ SOLVE
+       ▼                  ▼
+┌──────────────┐   ┌──────────────┐
+│ Extract      │   │ Retrieve     │
+│ Facts        │   │ Context      │
+└──────┬───────┘   └──────┬───────┘
+       │                  │
+       ▼                  ▼
+┌──────────────┐   ┌──────────────┐
+│ Check        │   │ ReAct        │
+│ Conflicts    │   │ Loop         │
+└──────┬───────┘   └──────┬───────┘
+       │                  │
+       ▼                  ▼
+┌──────────────┐   ┌──────────────┐
+│ Auto-Resolve │   │ Generate     │
+│ (new > old)  │   │ Answer       │
+└──────┬───────┘   └──────┬───────┘
+       │                  │
+       ▼                  │
+┌──────────────┐          │
+│ Store to     │          │
+│ Graphiti     │          │
+└──────┬───────┘          │
+       │                  │
+       ▼                  ▼
+    Response          Response
+  + confirmation    + references
 ```
 
-### 2. Настройка окружения
+### Agent Nodes
+
+**TEACH Path (агент навчається):**
+1. `classify` - визначає intent (TEACH/SOLVE)
+2. `extract_facts` - витягує structured facts з повідомлення
+3. `check_conflicts` - детектує конфлікти з існуючими знаннями
+4. `auto_resolve` - автоматично приймає нову інформацію
+5. `generate_confirmation` - демонструє розуміння навченого
+6. `store_knowledge` - зберігає в Graphiti + Neo4j
+
+**SOLVE Path (агент відповідає):**
+1. `classify` - визначає intent
+2. `retrieve_context` - шукає релевантний контекст у пам'яті
+3. `react_loop` - ітеративне міркування та пошук
+4. `generate_answer` - генерує відповідь з обов'язковими references
+
+---
+
+## 📦 Вимоги
+
+### Системні вимоги
+- Docker та Docker Compose
+- 16GB+ RAM
+- 10GB+ вільного місця на диску
+
+### Зовнішні сервіси
+- **vLLM сервер** з Lapa LLM (запущений окремо)
+- Опціонально: hosted embeddings API
+
+---
+
+## 🚀 Швидкий старт
+
+### 1. Створити .env файл
 
 ```bash
-# Скопируйте шаблон конфигурации
-cp .env.example .env
-
-# Отредактируйте .env файл при необходимости
-# По умолчанию настроено для локального запуска
+make env
+# або
+cp env.example .env
 ```
 
-### 3. Запуск Neo4j
+### 2. Налаштувати .env
+
+**КРИТИЧНО:** Встановіть URL до вашого vLLM сервера:
 
 ```bash
-# Запустите Neo4j через Docker Compose
-docker-compose up -d
+# Якщо vLLM запущений локально на host:
+VLLM_BASE_URL=http://host.docker.internal:8000/v1
 
-# Проверьте статус
-docker-compose ps
+# Якщо vLLM на іншому сервері:
+VLLM_BASE_URL=http://your-server-ip:8000/v1
 
-# Neo4j Web UI доступен по адресу: http://localhost:7474
-# Логин: neo4j, пароль: password123
+# Інші важливі налаштування:
+NEO4J_PASSWORD=password123
+LOG_LEVEL=INFO
 ```
 
-### 4. Запуск vLLM с Lapa LLM
-
-#### Опция A: vLLM локально (требует GPU)
+### 3. Запустити через Docker Compose
 
 ```bash
-# Установите vLLM
-pip install vllm
+# Швидкий старт (все в одній команді)
+make quick-start
 
-# Запустите сервер с Lapa LLM
-vllm serve lapa-llm/lapa-v0.1.2-instruct \
-  --host 0.0.0.0 \
-  --port 8000 \
-  --max-model-len 4096
+# Або вручну:
+docker-compose up -d --build
 ```
 
-#### Опция B: vLLM через Docker
+**Перший запуск займе 5-10 хвилин** (завантаження ML моделей в образ).
+
+### 4. Перевірити
 
 ```bash
-docker run --gpus all \
-  -p 8000:8000 \
-  vllm/vllm-openai:latest \
-  --model lapa-llm/lapa-v0.1.2-instruct
+# Через Makefile
+make health
+
+# Або через curl
+curl http://localhost:3000/health
 ```
 
-#### Опция C: Ollama (проще для CPU)
-
-```bash
-# Установите Ollama: https://ollama.ai
-ollama pull lapa-llm/lapa-v0.1.2-instruct
-
-# Запустите сервер
-ollama serve
-```
-
-### 5. Запуск demo
-
-```bash
-# Откройте Jupyter Notebook
-jupyter notebook demo_flow.ipynb
-
-# Или запустите Jupyter Lab
-jupyter lab demo_flow.ipynb
+**Очікувана відповідь:**
+```json
+{
+  "status": "healthy",
+  "timestamp": "2026-01-11T..."
+}
 ```
 
 ---
 
-## 📁 Структура проекта
+## 📡 Використання API
 
+### Endpoints
+
+- **API Root**: http://localhost:3000/
+- **Swagger UI**: http://localhost:3000/docs
+- **Health**: http://localhost:3000/health
+- **Text**: POST http://localhost:3000/text
+- **Neo4j UI**: http://localhost:7474 (neo4j/password123)
+
+### Приклади запитів
+
+#### Навчання агента (TEACH)
+
+```bash
+curl -X POST http://localhost:3000/text \
+  -H "Content-Type: application/json" \
+  -d '{
+    "text": "Значення pi дорівнює 3.14",
+    "user_id": "test-user"
+  }'
 ```
-llm/graphity_lapa/
-├── docker-compose.yml          # Neo4j setup
-├── requirements.txt            # Python зависимости
-├── .env.example               # Шаблон конфигурации
-├── README.md                  # Эта документация
-├── config/
-│   ├── __init__.py
-│   └── settings.py            # Настройки (LLM, DB, Graphiti)
-├── clients/
-│   ├── __init__.py
-│   ├── llm_client.py          # Wrapper для vLLM/OpenAI API
-│   └── graphiti_client.py     # Graphiti с кастомным LLM
-├── agent/
-│   ├── __init__.py
-│   ├── state.py               # Определение State для LangGraph
-│   ├── nodes.py               # Узлы: retrieve, generate, save
-│   └── graph.py               # Сборка LangGraph
-├── models/
-│   ├── __init__.py
-│   └── schemas.py             # Pydantic модели
-└── demo_flow.ipynb            # Демонстрационный notebook
+
+**Відповідь:**
+```json
+{
+  "response": "Зрозумів! Тепер я знаю що pi = 3.14. Це числова константа.\n\n✓ Навчання збережено.",
+  "references": ["msg-001"]
+}
+```
+
+#### Запит до агента (SOLVE)
+
+```bash
+curl -X POST http://localhost:3000/text \
+  -H "Content-Type: application/json" \
+  -d '{
+    "text": "Яке значення pi?",
+    "user_id": "test-user"
+  }'
+```
+
+**Відповідь:**
+```json
+{
+  "response": "Значення pi дорівнює 3.14 [msg-001].",
+  "references": ["msg-001"],
+  "reasoning": "Крок 1: Пошук інформації про pi..."
+}
+```
+
+#### Оновлення інформації (Auto-resolve)
+
+```bash
+# Спочатку навчаємо
+curl -X POST http://localhost:3000/text \
+  -H "Content-Type: application/json" \
+  -d '{"text": "Столиця України - Київ", "user_id": "test"}'
+
+# Потім оновлюємо (для тесту)
+curl -X POST http://localhost:3000/text \
+  -H "Content-Type: application/json" \
+  -d '{"text": "Столиця України - Львів", "user_id": "test"}'
+```
+
+**Відповідь (автоматичне оновлення):**
+```json
+{
+  "response": "✓ Інформацію оновлено\n\n**Було** (msg-001):\nКиїв є_столицею України\n\n**Тепер** (msg-002):\nЛьвів є_столицею України\n\nЯ оновив свої знання...",
+  "references": ["msg-001", "msg-002"]
+}
 ```
 
 ---
 
-## ⚙️ Конфигурация
+## 📁 Структура проєкту
 
-Все настройки находятся в файле `.env`. Основные параметры:
+```
+graphity_lapa/
+├── 🐳 Docker
+│   ├── Dockerfile                    # Multi-stage build з ML моделями
+│   ├── docker-compose.yml            # Agent + Neo4j
+│   ├── .dockerignore
+│   └── env.example
+│
+├── 🔧 Configuration
+│   ├── config/
+│   │   ├── settings.py               # Pydantic settings
+│   │   └── logging_config.py
+│   └── requirements.txt
+│
+├── 🤖 Agent
+│   ├── agent/
+│   │   ├── state.py                  # AgentState TypedDict
+│   │   ├── graph.py                  # LangGraph topology
+│   │   ├── helpers.py                # Utility functions
+│   │   └── nodes/
+│   │       ├── classify.py           # Intent classification
+│   │       ├── extract.py            # Fact extraction
+│   │       ├── conflicts.py          # Conflict detection
+│   │       ├── auto_resolve.py       # Auto-accept new info
+│   │       ├── resolve.py            # Manual resolution (backup)
+│   │       ├── confirm.py            # Confirmation generation
+│   │       ├── store.py              # Knowledge storage
+│   │       ├── retrieve.py           # Context retrieval
+│   │       ├── react.py              # ReAct reasoning
+│   │       └── generate.py           # Answer generation
+│
+├── 🔌 Clients
+│   ├── clients/
+│   │   ├── llm_client.py             # LLM wrapper (Lapa)
+│   │   ├── graphiti_client.py        # Graphiti с custom LLM
+│   │   └── hosted_embedder.py        # Hosted embeddings
+│
+├── 🗄️ Database
+│   ├── db/
+│   │   └── neo4j_helpers.py          # Message references store
+│
+├── 🌐 API
+│   ├── app.py                        # FastAPI application
+│   └── routers/
+│       ├── text.py                   # /text endpoint
+│       └── schemas.py                # Request/Response models
+│
+└── 📚 Documentation
+    ├── README.md                     # Цей файл
+    ├── QUICKSTART.md                 # Швидкий старт (3 команди)
+    ├── DOCKER_SETUP.md               # Детальний Docker setup
+    ├── TABULA_RASA_IMPLEMENTATION.md # Імплементація
+    └── TABULA_RASA_TESTING.md        # Testing guide
+```
 
-### LLM Configuration
-```env
-VLLM_BASE_URL=http://localhost:8000/v1
-VLLM_MODEL_NAME=lapa-llm/lapa-v0.1.2-instruct
+---
+
+## 🛠️ Корисні команди
+
+### Управління (через Makefile)
+
+```bash
+make up          # Запустити
+make down        # Зупинити
+make restart     # Перезапустити
+make logs        # Дивитись логи
+make ps          # Статус сервісів
+```
+
+### Тестування
+
+```bash
+make health         # Перевірка API
+make test-teach     # Тест навчання
+make test-solve     # Тест запиту
+make check-vllm     # Перевірка vLLM
+```
+
+### Розробка
+
+```bash
+make dev-up         # Setup для розробки
+make dev-rebuild    # Rebuild без кешу
+make logs-agent     # Логи агента
+make shell-agent    # Shell в контейнері
+```
+
+### UI
+
+```bash
+make docs           # Відкрити API docs
+make neo4j-query    # Відкрити Neo4j Browser
+```
+
+**Повний список команд:** `make help`
+
+---
+
+## ⚙️ Конфігурація
+
+### Environment Variables (.env)
+
+```bash
+# === LLM Configuration ===
+VLLM_BASE_URL=http://host.docker.internal:8000/v1
+VLLM_MODEL_NAME=lapa
 LLM_TEMPERATURE=0.7
 LLM_MAX_TOKENS=2048
-```
 
-### Neo4j Configuration
-```env
-NEO4J_URI=bolt://localhost:7687
+# === Neo4j ===
+NEO4J_URI=bolt://neo4j:7687
 NEO4J_USER=neo4j
 NEO4J_PASSWORD=password123
-```
 
-### Graphiti Configuration
-```env
-GRAPHITI_MAX_EPISODE_LENGTH=10000
+# === Embeddings ===
+USE_HOSTED_EMBEDDINGS=true  # false для local
+EMBEDDING_MODEL=sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2
+
+# === Graphiti ===
 GRAPHITI_SEARCH_LIMIT=10
 GRAPHITI_RELEVANCE_THRESHOLD=0.7
-```
 
-### Embeddings (для украинского языка)
-```env
-EMBEDDING_MODEL_NAME=sentence-transformers/paraphrase-multilingual-mpnet-base-v2
+# === Logging ===
+LOG_LEVEL=INFO  # DEBUG для детального логування
+
+# === LangSmith (optional) ===
+LANGSMITH_API_KEY=your-key
+LANGSMITH_TRACING_V2=false
 ```
 
 ---
 
-## 🧪 Тестирование компонентов
+## 🧪 Тестування
 
-### Проверка vLLM
+### Сценарій 1: Базове навчання
+
 ```bash
-curl http://localhost:8000/v1/models
-curl http://localhost:8000/health
+# 1. Навчити факт
+curl -X POST http://localhost:3000/text \
+  -H "Content-Type: application/json" \
+  -d '{"text": "У системі Alpha команда має формат: дія об'\''єкт параметри", "user_id": "test"}'
+
+# 2. Застосувати навчене
+curl -X POST http://localhost:3000/text \
+  -H "Content-Type: application/json" \
+  -d '{"text": "Створи команду для видалення файлу test.txt", "user_id": "test"}'
+
+# Очікується: використання навченої структури з references
 ```
 
-### Проверка Neo4j
-Откройте http://localhost:7474 и выполните:
-```cypher
-MATCH (n) RETURN n LIMIT 25
+### Сценарій 2: Auto-resolve конфліктів
+
+```bash
+# 1. Навчити початкове значення
+curl -X POST http://localhost:3000/text \
+  -H "Content-Type: application/json" \
+  -d '{"text": "Значення pi дорівнює 3.14", "user_id": "test"}'
+
+# 2. Оновити значення
+curl -X POST http://localhost:3000/text \
+  -H "Content-Type: application/json" \
+  -d '{"text": "Значення pi дорівнює 4", "user_id": "test"}'
+
+# Очікується: автоматичне оновлення на нове значення
 ```
 
-### Проверка Python компонентов
-```python
-from clients.llm_client import get_llm_client
-from clients.graphiti_client import get_graphiti_client
+### Сценарій 3: Визнання gaps
 
-# Тест LLM
-llm = get_llm_client()
-response = await llm.generate_async([
-    {"role": "user", "content": "Привіт!"}
-])
-print(response)
+```bash
+# Запитати про щось ненавчене
+curl -X POST http://localhost:3000/text \
+  -H "Content-Type: application/json" \
+  -d '{"text": "Що таке Python?", "user_id": "test"}'
 
-# Тест Graphiti
-graphiti = await get_graphiti_client()
-stats = await graphiti.get_graph_stats()
-print(stats)
+# Очікується: "На жаль, я не маю інформації про Python..."
 ```
 
----
-
-## 💡 Примеры использования
-
-### Базовый диалог
-
-```python
-from langchain_core.messages import HumanMessage
-from agent.graph import get_agent_app
-
-agent = get_agent_app()
-
-# Первое сообщение
-result = await agent.ainvoke({
-    "messages": [HumanMessage(content="Привіт! Мене звати Олег.")],
-    "user_id": "user_1",
-    "session_id": "session_1",
-    # ... остальные поля state
-})
-
-print(result["messages"][-1].content)
-```
-
-### Поиск в памяти
-
-```python
-from clients.graphiti_client import get_graphiti_client
-
-graphiti = await get_graphiti_client()
-
-# Поиск информации
-results = await graphiti.search("Олег", limit=5)
-for result in results:
-    print(result['content'])
-```
-
-### Визуализация графа
-
-Откройте Neo4j Browser (http://localhost:7474) и выполните:
-
-```cypher
-// Все узлы и связи
-MATCH (n)-[r]->(m)
-RETURN n, r, m
-LIMIT 100
-
-// Узлы определенного типа
-MATCH (n:Entity)
-WHERE n.name CONTAINS 'Олег'
-RETURN n
-
-// Связи между сущностями
-MATCH (a:Entity)-[r:RELATIONSHIP]->(b:Entity)
-RETURN a.name, type(r), b.name
-```
+**Детальний testing guide:** [TABULA_RASA_TESTING.md](TABULA_RASA_TESTING.md)
 
 ---
 
 ## 🔧 Troubleshooting
 
-### Проблема: vLLM не запускается
+### Agent не стартує
 
-**Решение:**
-- Убедитесь, что модель скачана: `huggingface-cli download lapa-llm/lapa-v0.1.2-instruct`
-- Проверьте доступную память: `nvidia-smi` (для GPU)
-- Используйте quantized версию для меньшего объема памяти
-
-### Проблема: Neo4j connection refused
-
-**Решение:**
 ```bash
-# Проверьте статус контейнера
-docker-compose ps
-
-# Перезапустите Neo4j
-docker-compose restart neo4j
-
-# Проверьте логи
-docker-compose logs neo4j
+make logs-agent  # Дивимось логи
+make dev-rebuild  # Rebuild без кешу
 ```
 
-### Проблема: Graphiti не создает индексы
+### vLLM недоступний
 
-**Решение:**
-```python
-# Вручную создайте индексы
-graphiti = await get_graphiti_client()
-await graphiti.graphiti.build_indices()
+```bash
+make check-vllm  # Перевірка
+# Виправте VLLM_BASE_URL в .env
+make restart-agent
 ```
 
-### Проблема: LLM не возвращает structured output
+### Neo4j не стартує
 
-**Решение:**
-- Убедитесь, что vLLM запущен с поддержкой JSON mode
-- Проверьте версию vLLM: `pip show vllm` (требуется 0.8.5+)
-- Используйте fallback на OpenAI API для тестирования: `USE_OPENAI_FALLBACK=true`
+```bash
+make logs-neo4j  # Логи
+sleep 30 && make ps  # Даємо більше часу (до 60 сек)
+```
+
+### Порт зайнятий
+
+У `docker-compose.yml`:
+```yaml
+agent:
+  ports:
+    - "8080:3000"  # Використати інший порт
+```
+
+**Детальний troubleshooting:** [DOCKER_SETUP.md](DOCKER_SETUP.md)
 
 ---
 
-## 📚 Документация API
+## 📚 Документація
 
-### LLM Client
-
-```python
-from clients.llm_client import LLMClient
-
-client = LLMClient(
-    base_url="http://localhost:8000/v1",
-    model_name="lapa-llm/lapa-v0.1.2-instruct"
-)
-
-# Async generation
-response = await client.generate_async(
-    messages=[{"role": "user", "content": "Hello"}],
-    temperature=0.7,
-    max_tokens=1024
-)
-
-# Structured output
-from models.schemas import AgentResponse
-response = await client.generate_async(
-    messages=messages,
-    response_format=AgentResponse
-)
-```
-
-### Graphiti Client
-
-```python
-from clients.graphiti_client import GraphitiClient
-
-async with GraphitiClient() as graphiti:
-    # Добавить эпизод
-    await graphiti.add_episode(
-        episode_body="User said hello",
-        episode_name="episode_1",
-        source_description="user_1"
-    )
-
-    # Поиск
-    results = await graphiti.search(
-        query="hello",
-        limit=10
-    )
-
-    # Статистика
-    stats = await graphiti.get_graph_stats()
-```
+- **[QUICKSTART.md](QUICKSTART.md)** - швидкий старт за 3 команди
+- **[DOCKER_SETUP.md](DOCKER_SETUP.md)** - детальний Docker setup
+- **[DOCKER_DEPLOYMENT.md](DOCKER_DEPLOYMENT.md)** - production deployment
+- **[TABULA_RASA_IMPLEMENTATION.md](TABULA_RASA_IMPLEMENTATION.md)** - імплементація змін
+- **[TABULA_RASA_TESTING.md](TABULA_RASA_TESTING.md)** - testing scenarios
 
 ---
 
-## 🎓 Полезные ссылки
+## 🎓 Корисні посилання
 
-### Документация
+### Документація технологій
 - [Graphiti GitHub](https://github.com/getzep/graphiti)
-- [LangGraph Docs](https://docs.langchain.com/oss/python/langgraph/)
+- [LangGraph Docs](https://langchain-ai.github.io/langgraph/)
 - [vLLM Documentation](https://docs.vllm.ai/)
-- [Lapa LLM на HuggingFace](https://huggingface.co/lapa-llm/lapa-v0.1.2-instruct)
+- [Lapa LLM на HuggingFace](https://huggingface.co/lapa-llm)
 
 ### Хакатон
 - [Tabula Rasa: Agent Genesis Task](https://www.notion.so/Tabula-Rasa-Agent-Genesis-Lapathon-Task-2dcb51a2f1a880e6a31ddcb7ecb84e00)
 
 ---
 
+## ✨ Особливості Tabula Rasa Agent
+
+### 1. Нульові знання про домен
+- ✅ НЕ використовує pretrained knowledge
+- ✅ Навчається виключно від користувача
+- ✅ Універсальний (працює з будь-яким доменом)
+
+### 2. Автоматичне оновлення конфліктів
+- ✅ Нова інформація автоматично замінює стару (pi=4 > pi=3.14)
+- ✅ Прозоре повідомлення про оновлення
+- ✅ References до обох джерел (старе + нове)
+
+### 3. Обов'язкові references
+- ✅ Кожна відповідь містить посилання [msg-XXX]
+- ✅ Точне мапування джерел (не індекси!)
+- ✅ Верифікація використаних знань
+
+### 4. Демонстрація розуміння
+- ✅ Не просто "запам'ятав", а показує розуміння структури
+- ✅ Різні підходи для різних типів контенту
+- ✅ Визнає gaps у знаннях
+
+### 5. Epistemic awareness
+- ✅ Confidence scores для фактів
+- ✅ Детекція 5 типів конфліктів
+- ✅ Reasoning trace для accountability
+
+---
+
 ## 🐛 Known Issues
 
-1. **agent/nodes.py** - функция `save_to_memory_node` неполная (строка 203+)
-   - Нужно дополнить код сохранения эпизода в Graphiti
-   - См. комментарии в файле
+1. **Reranker модель** - 2.27 GB, завантажується під час Docker build
+   - Перший build займає ~5-10 хвилин
+   - Модель включена в образ для швидкого старту
 
-2. **Embeddings** - первый запуск может быть медленным
-   - sentence-transformers скачивает модель при первом использовании
-   - ~400MB для paraphrase-multilingual-mpnet-base-v2
+2. **Embeddings** - перший запит може бути повільним (~5-10 сек)
+   - sentence-transformers ініціалізується при першому використанні
+   - Наступні запити швидкі
 
-3. **Memory usage** - 12B модель требует значительно памяти
-   - Минимум 16GB RAM для CPU inference
-   - Минимум 12GB VRAM для GPU inference
+3. **Neo4j startup** - може займати до 60 секунд
+   - Healthcheck чекає поки Neo4j готовий
+   - Docker Compose автоматично чекає через `depends_on`
 
 ---
 
 ## 🤝 Contributing
 
-Этот проект создан для хакатона. Для улучшений:
+Цей проєкт створено для хакатону. Для покращень:
 
-1. Fork репозиторий
-2. Создайте feature branch
-3. Commit изменения
+1. Fork репозиторій
+2. Створіть feature branch
+3. Commit зміни
 4. Push в branch
-5. Создайте Pull Request
+5. Створіть Pull Request
 
 ---
 
 ## 📄 License
 
-MIT License - см. LICENSE файл для деталей
+MIT License - див. LICENSE файл для деталей
 
 ---
 
 ## 👥 Authors
 
-- Хакатон проект для **Tabula Rasa: Agent Genesis**
-- Используемые технологии: Lapa LLM, Graphiti, LangGraph, Neo4j
+- Хакатон проєкт для **Tabula Rasa: Agent Genesis**
+- Використані технології: Lapa LLM, Graphiti, LangGraph, Neo4j, FastAPI
 
 ---
 
-## 🎉 Благодарности
+## 🎉 Подяки
 
-- Команде **Lapa LLM** за украинскую модель
+- Команді **Lapa LLM** за українську модель
 - **Zep** за фреймворк Graphiti
 - **LangChain** за LangGraph
-- Организаторам **Lapathon** за мотивацию!
+- Організаторам **Lapathon** за мотивацію!
+
+---
+
+# English Version
+
+## 🎯 Project Overview
+
+**Tabula Rasa Agent** is a knowledge-centered conversational AI agent that starts with zero knowledge about any domain and learns exclusively from user interactions.
+
+### Key Features
+
+✨ **Tabula Rasa** - agent starts with zero domain knowledge  
+🧠 **Graph Memory** - stores knowledge in temporal knowledge graph  
+🇺🇦 **Ukrainian Language** - optimized for Ukrainian using Lapa LLM  
+🔍 **Hybrid Search** - semantic + BM25 + graph traversal  
+⏱️ **Temporal** - tracks time of events and facts  
+🔗 **References** - every response includes source citations  
+🔄 **Auto-resolve** - automatically updates conflicting information  
+
+### Technologies
+
+- **Lapa LLM** - Ukrainian language model (Gemma 12B based)
+- **Graphiti** - Temporal knowledge graph
+- **LangGraph** - Agent orchestration framework
+- **Neo4j** - Graph database
+- **FastAPI** - REST API
+
+---
+
+## 🚀 Quick Start
+
+### 1. Setup environment
+
+```bash
+make env
+nano .env  # Set VLLM_BASE_URL
+```
+
+### 2. Start with Docker
+
+```bash
+make quick-start
+```
+
+### 3. Test API
+
+```bash
+curl http://localhost:3000/health
+```
+
+**Documentation:**
+- Swagger UI: http://localhost:3000/docs
+- Neo4j Browser: http://localhost:7474
+
+---
+
+## 📡 API Examples
+
+### Teach the agent
+
+```bash
+curl -X POST http://localhost:3000/text \
+  -H "Content-Type: application/json" \
+  -d '{"text": "The value of pi equals 3.14", "user_id": "test"}'
+```
+
+### Query the agent
+
+```bash
+curl -X POST http://localhost:3000/text \
+  -H "Content-Type: application/json" \
+  -d '{"text": "What is the value of pi?", "user_id": "test"}'
+```
+
+Response includes `references` with source message UIDs.
+
+---
+
+## 📚 Documentation
+
+- **[QUICKSTART.md](QUICKSTART.md)** - 3-command quick start
+- **[DOCKER_SETUP.md](DOCKER_SETUP.md)** - detailed Docker setup
+- **[TABULA_RASA_TESTING.md](TABULA_RASA_TESTING.md)** - testing scenarios
+
+---
+
+## 🛠️ Commands
+
+```bash
+make help          # Show all commands
+make up            # Start services
+make logs          # View logs
+make test-teach    # Test teaching
+make test-solve    # Test querying
+```
+
+---
+
+## ⚙️ Configuration
+
+Edit `.env` file:
+
+```bash
+VLLM_BASE_URL=http://host.docker.internal:8000/v1
+NEO4J_PASSWORD=password123
+LOG_LEVEL=INFO
+```
+
+---
+
+## 🎯 Key Principles
+
+### Tabula Rasa
+- No pretrained domain knowledge
+- Learns only from user
+- Universal (works with any domain)
+
+### Auto-resolve Conflicts
+- New information automatically replaces old
+- pi=4 replaces pi=3.14
+- Transparent notification with references
+
+### Mandatory References
+- Every response cites sources [msg-XXX]
+- Exact source mapping (not indices)
+- Verification of used knowledge
+
+---
+
+## 📄 License
+
+MIT License
+
+---
+
+**Ready to start!** 🚀
+
+```bash
+make quick-start
+```
