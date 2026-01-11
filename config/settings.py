@@ -28,7 +28,7 @@ class Settings(BaseSettings):
         description="API key for vLLM (usually not required for local servers)"
     )
     vllm_model_name: str = Field(
-        default="lapa-llm/lapa-v0.1.2-instruct",
+        default="lapa",
         description="Model name/path for Lapa LLM"
     )
     llm_temperature: float = Field(
