@@ -28,7 +28,7 @@ class Settings(BaseSettings):
         description="API key for vLLM (usually not required for local servers)"
     )
     vllm_model_name: str = Field(
-        default="lapa-llm/lapa-v0.1.2-instruct",
+        default="lapa",
         description="Model name/path for Lapa LLM"
     )
     llm_temperature: float = Field(
@@ -125,6 +125,24 @@ class Settings(BaseSettings):
     use_openai_fallback: bool = Field(
         default=False,
         description="Use OpenAI API instead of vLLM"
+    )
+
+    # ReAct Configuration
+    max_react_iterations: int = Field(
+        default=3,
+        description="Maximum iterations for ReAct loop"
+    )
+
+    # Conflict detection
+    conflict_detection_threshold: float = Field(
+        default=0.7,
+        description="Minimum confidence to detect conflict"
+    )
+
+    # Knowledge quality
+    min_fact_confidence: float = Field(
+        default=0.5,
+        description="Minimum confidence for extracted facts"
     )
 
     # Debug settings

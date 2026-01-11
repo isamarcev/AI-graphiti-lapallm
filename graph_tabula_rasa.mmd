@@ -1,0 +1,39 @@
+graph TD
+    Start([User Message]) --> Classify[1. Classify Intent<br/>🚫 TABULA RASA]
+    
+    Classify -->|TEACH| Extract[2. Extract Facts<br/>🚫 TABULA RASA<br/>Universal examples]
+    Classify -->|SOLVE| Retrieve[6. Retrieve Context<br/>From Graphiti]
+    
+    %% TEACH Path
+    Extract --> CheckConflicts[3. Check Conflicts<br/>LLM contradiction detection]
+    
+    CheckConflicts -->|No Conflicts| Confirm[5. Generate Confirmation<br/>Show understanding]
+    CheckConflicts -->|Conflicts Found| AutoResolve[4a. Auto-Resolve<br/>🆕 Accept new info<br/>pi=4 replaces pi=3.14]
+    
+    AutoResolve --> Store[5. Store Knowledge<br/>Graphiti + Neo4j]
+    Confirm --> Store
+    
+    Store --> EndTeach([Response with<br/>confirmation])
+    
+    %% SOLVE Path
+    Retrieve --> React[7. ReAct Loop<br/>🚫 TABULA RASA<br/>Reasoning + Acting]
+    React --> Generate[8. Generate Answer<br/>🚫 TABULA RASA<br/>Only from learned]
+    Generate --> EndSolve([Response with<br/>references])
+    
+    %% Backup path (manual resolution if needed)
+    CheckConflicts -.->|Critical Cases| ResolveManual[4b. Resolve Conflict<br/>Manual - ASK user]
+    ResolveManual -.-> EndManual([Wait for user])
+    
+    %% Styling
+    classDef tabulaRasa fill:#ff6b6b,stroke:#c92a2a,stroke-width:3px,color:#fff
+    classDef newNode fill:#51cf66,stroke:#2f9e44,stroke-width:3px,color:#fff
+    classDef backupNode fill:#868e96,stroke:#495057,stroke-width:2px,color:#fff,stroke-dasharray: 5 5
+    
+    class Classify,Extract,React,Generate tabulaRasa
+    class AutoResolve newNode
+    class ResolveManual backupNode
+    
+    %% Notes
+    Note1[🚫 TABULA RASA:<br/>No pretrained knowledge<br/>Universal examples<br/>Learn from user only]
+    Note2[🆕 AUTO-RESOLVE:<br/>New info auto-replaces old<br/>Transparent notification<br/>References to both sources]
+    Note3[🔗 REFERENCES:<br/>Every answer cites sources<br/>Format: Джерело N<br/>Transparent verification]
