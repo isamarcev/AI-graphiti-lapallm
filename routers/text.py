@@ -33,6 +33,7 @@ async def process_text(request: TextRequest) -> TextResponse:
     Raises:
         HTTPException: If agent processing fails
     """
+    time_start = datetime.now()
     logger.info(f"Processing text request: uid={request.uid}, user={request.user_id}")
     logger.debug(f"Message: {request.text[:100]}...")
     
@@ -69,7 +70,8 @@ async def process_text(request: TextRequest) -> TextResponse:
             raise ValueError("Agent returned empty response")
         
         logger.info(f"Returning response with {len(references)} references")
-        
+        time_end = datetime.now()
+        logger.info(f"Processing time: {time_end - time_start}")
         return TextResponse(
             response=response_text,
             references=references,
