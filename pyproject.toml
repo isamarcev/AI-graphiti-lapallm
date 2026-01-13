@@ -16,6 +16,7 @@ dependencies = [
     "langchain>=0.1.0",
     "langchain-community>=0.0.20",
     "langchain-core>=0.1.0",
+    "langchain-openai>=1.1.6",
     "langgraph>=0.0.40",
     "langgraph-checkpoint>=0.0.5",
     "langsmith>=0.1.0",

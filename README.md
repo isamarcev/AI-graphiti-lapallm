@@ -17,6 +17,7 @@
 - **LangGraph** - фреймворк для побудови агентів зі станом
 - **Neo4j** - графова база даних для knowledge + message references
 - **FastAPI** - REST API endpoints
+- **Uv** - package manager
 
 ### Ключові можливості
 
