@@ -27,11 +27,11 @@ env: ## Створити .env файл з прикладу
 
 build: ## Збілдити Docker images
 	@echo "$(BLUE)Building Docker images...$(NC)"
-	docker-compose build
+	docker compose build
 
 up: ## Запустити всі сервіси
 	@echo "$(BLUE)Starting services...$(NC)"
-	docker-compose up -d
+	docker compose up -d
 	@echo "$(GREEN)✓ Services started!$(NC)"
 	@echo "$(YELLOW)API: http://localhost:3000$(NC)"
 	@echo "$(YELLOW)Docs: http://localhost:3000/docs$(NC)"
@@ -39,47 +39,47 @@ up: ## Запустити всі сервіси
 
 up-build: ## Збілдити та запустити
 	@echo "$(BLUE)Building and starting services...$(NC)"
-	docker-compose up -d --build
+	docker compose up --build
 	@echo "$(GREEN)✓ Services started!$(NC)"
 
 down: ## Зупинити всі сервіси
 	@echo "$(BLUE)Stopping services...$(NC)"
-	docker-compose down
+	docker compose down
 	@echo "$(GREEN)✓ Services stopped$(NC)"
 
-down-volumes: ## Зупинити та видалити volumes (ВИДАЛИТЬ ВСІ ДАНІ!)
+down-v: ## Зупинити та видалити volumes (ВИДАЛИТЬ ВСІ ДАНІ!)
 	@echo "$(YELLOW)⚠ WARNING: This will delete all data!$(NC)"
 	@read -p "Are you sure? [y/N] " -n 1 -r; \
 	echo; \
 	if [[ $$REPLY =~ ^[Yy]$$ ]]; then \
-		docker-compose down -v; \
+		docker compose down -v; \
 		echo "$(GREEN)✓ Services stopped and volumes removed$(NC)"; \
 	fi
 
 restart: ## Перезапустити всі сервіси
 	@echo "$(BLUE)Restarting services...$(NC)"
-	docker-compose restart
+	docker compose restart
 	@echo "$(GREEN)✓ Services restarted$(NC)"
 
 restart-agent: ## Перезапустити тільки agent
 	@echo "$(BLUE)Restarting agent...$(NC)"
-	docker-compose restart agent
+	docker compose restart agent
 	@echo "$(GREEN)✓ Agent restarted$(NC)"
 
 logs: ## Показати логи (Ctrl+C для виходу)
-	docker-compose logs -f
+	docker compose logs -f
 
 logs-agent: ## Показати логи agent
-	docker-compose logs -f agent
+	docker compose logs -f agent
 
 logs-neo4j: ## Показати логи neo4j
-	docker-compose logs -f neo4j
+	docker compose logs -f neo4j
 
 ps: ## Показати статус сервісів
-	docker-compose ps
+	docker compose ps
 
 shell-agent: ## Увійти в shell контейнера agent
-	docker-compose exec agent bash
+	docker compose exec agent bash
 
 shell-neo4j: ## Увійти в shell контейнера neo4j
 	docker-compose exec neo4j bash

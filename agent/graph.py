@@ -1,5 +1,6 @@
 """
 LangGraph assembly - knowledge-centered agent з teach/solve branches.
+Simplified architecture: classify -> (teach: store | solve: retrieve -> react -> generate)
 """
 
 import logging
@@ -8,15 +9,11 @@ from langgraph.checkpoint.memory import MemorySaver
 
 from agent.state import AgentState
 from agent.nodes.classify import classify_intent_node
-from agent.nodes.extract import extract_facts_node
-from agent.nodes.conflicts import check_conflicts_node
-from agent.nodes.auto_resolve import auto_resolve_conflict_node  # Auto-accept new info
-from agent.nodes.resolve import resolve_conflict_node  # Manual resolution (backup)
-from agent.nodes.confirm import generate_confirmation_node
 from agent.nodes.store import store_knowledge_node
 from agent.nodes.retrieve import retrieve_context_node
 from agent.nodes.react import react_loop_node
-from agent.nodes.generate import generate_answer_node
+from agent.nodes.generate_teach_response import generate_teach_response_node
+from agent.nodes.generate_solve_response import generate_solve_response_node
 
 logger = logging.getLogger(__name__)
 
@@ -38,105 +35,65 @@ def route_by_intent(state: AgentState) -> str:
     return intent
 
 
-def route_conflicts(state: AgentState) -> str:
-    """
-    Route після check_conflicts node.
-    
-    For Tabula Rasa agent: auto-accept new information (conflicts resolved automatically).
-    Manual resolution kept as backup for critical cases.
-
-    Returns:
-        "auto_resolve" if conflicts found (auto-accept new info),
-        "confirm" if no conflicts
-    """
-    conflicts = state.get("conflicts", [])
-
-    if conflicts:
-        logger.info(f"Conflicts found: {len(conflicts)}, routing to auto-resolve (accept new)")
-        return "auto_resolve"
-
-    logger.info("No conflicts, proceeding to generate confirmation")
-    return "confirm"
-
-
 def create_agent_graph():
     """
-    Create knowledge-centered agent з bidirectional flow.
+    Create knowledge-centered agent with separated teach/solve responses.
 
     Architecture:
     - Entry: classify intent (teach/solve)
-    - TEACH branch: extract facts → check conflicts → [auto_resolve → store | confirm → store]
-      (Tabula Rasa: new info auto-replaces old)
-    - SOLVE branch: retrieve context → react loop → generate answer
+    - TEACH branch: store_knowledge → generate_teach_response → END
+    - SOLVE branch: retrieve_context → react_loop → generate_solve_response → END
 
-    Implements key concepts from paper (Báez Santamaría, 2024):
-    - Bidirectional knowledge flow (agent asks when conflicts detected)
-    - Knowledge quality assessment (confidence, conflicts, completeness)
-    - Epistemic awareness (reasoning about knowledge state)
+    Each branch has dedicated response generation node.
 
     Returns:
         Compiled LangGraph application
     """
-    logger.info("Creating knowledge-centered agent graph...")
-    
+    logger.info("Creating knowledge-centered agent graph with separated responses...")
+
     workflow = StateGraph(AgentState)
-    
-    # Add all nodes
+
+    # Add nodes - окремі ноди для teach і solve responses
     logger.debug("Adding nodes to graph...")
     workflow.add_node("classify", classify_intent_node)
-    workflow.add_node("extract_facts", extract_facts_node)
-    workflow.add_node("check_conflicts", check_conflicts_node)
-    workflow.add_node("auto_resolve", auto_resolve_conflict_node)  # Auto-accept new info
-    workflow.add_node("resolve_conflict", resolve_conflict_node)  # Manual resolution (backup)
-    workflow.add_node("generate_confirmation", generate_confirmation_node)
     workflow.add_node("store_knowledge", store_knowledge_node)
+    workflow.add_node("generate_teach_response", generate_teach_response_node)
     workflow.add_node("retrieve_context", retrieve_context_node)
     workflow.add_node("react_loop", react_loop_node)
-    workflow.add_node("generate_answer", generate_answer_node)
-    
+    workflow.add_node("generate_solve_response", generate_solve_response_node)
+
     # Entry point
     workflow.set_entry_point("classify")
     logger.debug("Entry point set to 'classify'")
-    
-    # Conditional routing після classify
+
+    # Conditional routing від classify
     workflow.add_conditional_edges(
         "classify",
         route_by_intent,
         {
-            "teach": "extract_facts",
+            "teach": "store_knowledge",
             "solve": "retrieve_context"
         }
     )
     logger.debug("Added conditional routing from classify")
-    
-    # TEACH path
-    workflow.add_edge("extract_facts", "check_conflicts")
-    workflow.add_conditional_edges(
-        "check_conflicts",
-        route_conflicts,
-        {
-            "auto_resolve": "auto_resolve",  # Auto-accept new info (Tabula Rasa)
-            "confirm": "generate_confirmation"
-        }
-    )
-    workflow.add_edge("generate_confirmation", "store_knowledge")
-    workflow.add_edge("auto_resolve", "store_knowledge")  # Continue after auto-resolve
-    workflow.add_edge("resolve_conflict", END)  # Manual resolution (if needed) - wait for user
-    workflow.add_edge("store_knowledge", END)
-    logger.debug("TEACH path configured (with auto-resolve)")
-    
-    # SOLVE path
+
+    # TEACH path: store → generate confirmation → END
+    workflow.add_edge("store_knowledge", "generate_teach_response")
+    workflow.add_edge("generate_teach_response", END)
+    logger.debug("TEACH path configured (store → teach_response)")
+
+    # SOLVE path: retrieve → react → generate answer → END
     workflow.add_edge("retrieve_context", "react_loop")
-    workflow.add_edge("react_loop", "generate_answer")
-    workflow.add_edge("generate_answer", END)
-    logger.debug("SOLVE path configured")
-    
+    workflow.add_edge("react_loop", "generate_solve_response")
+    workflow.add_edge("generate_solve_response", END)
+    logger.debug("SOLVE path configured (retrieve → react → solve_response)")
+
     # Compile with checkpointing for conversation memory
     memory = MemorySaver()
     app = workflow.compile(checkpointer=memory)
-    
-    logger.info("Knowledge-centered agent graph compiled successfully")
-    
+
+    logger.info("Knowledge-centered agent graph compiled successfully with separated responses")
+
     return app
 
 
