@@ -17,13 +17,6 @@ COPY requirements.txt .
 # Встановлення Python залежностей (без dev dependencies)
 RUN pip install --no-cache-dir --user -r requirements.txt
 
-# Завантаження ML моделей під час build (щоб були в образі)
-# Reranker: BAAI/bge-reranker-v2-m3 (~2.27 GB)
-# Embeddings: sentence-transformers (~420 MB)
-RUN python -c "from sentence_transformers import CrossEncoder; CrossEncoder('BAAI/bge-reranker-v2-m3')" && \
-    python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2')"
-
-
 # Production stage
 FROM python:3.11-slim
 
@@ -44,9 +37,6 @@ WORKDIR /app
 
 # Копіювання Python пакетів з builder stage
 COPY --from=builder /root/.local /home/appuser/.local
-
-# Копіювання ML моделей з builder stage (завантажені під час build)
-COPY --from=builder --chown=appuser:appuser /root/.cache /home/appuser/.cache
 
 # Копіювання коду застосунку
 COPY --chown=appuser:appuser . .

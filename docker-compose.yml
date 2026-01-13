@@ -2,20 +2,61 @@ version: '3.8'
 
 services:
   # ============================================
+  # Phoenix - Observability та Tracing
+  # ============================================
+  phoenix:
+    image: arizephoenix/phoenix:latest
+    container_name: graphiti-lapa-phoenix
+    ports:
+      - "6006:6006"  # Phoenix Web UI
+    environment:
+      - PHOENIX_PORT=6006
+      - PHOENIX_WORKING_DIR=/phoenix
+    volumes:
+      - phoenix_data:/phoenix
+    networks:
+      - graphiti-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:6006/healthz').read()"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+
+  # ============================================
   # Tabula Rasa Agent - Main Application
   # ============================================
   agent:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: tabula-rasa-agent
+    container_name: graphiti-lapa-agent
     ports:
       - "3000:3000"  # API endpoint
     env_file:
       - .env
+    environment:
+      # Phoenix observability
+      - ENABLE_PHOENIX=true
+      - PHOENIX_COLLECTOR_ENDPOINT=http://phoenix:6006
+      - PHOENIX_PROJECT_NAME=graphiti-lapa-agent
+    volumes:
+      # Mount code for live updates during development
+      - ./agent:/app/agent
+      - ./clients:/app/clients
+      - ./routers:/app/routers
+      - ./config:/app/config
+      - ./models:/app/models
+      - ./utils:/app/utils
+      - ./db:/app/db
+      # Mount .env for prompt updates without rebuild
+      - ./.env:/app/.env
     depends_on:
       neo4j:
         condition: service_healthy
+      phoenix:
+        condition: service_started
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
       interval: 30s
@@ -34,7 +75,7 @@ services:
   # ============================================
   neo4j:
     image: neo4j:5.26
-    container_name: tabula-rasa-neo4j
+    container_name: graphiti-lapa-neo4j
     ports:
       - "7474:7474"  # HTTP Web UI
       - "7687:7687"  # Bolt protocol
@@ -60,6 +101,8 @@ volumes:
   neo4j_data:
     driver: local
   neo4j_logs:
+    driver: local
+  phoenix_data:
     driver: local
 
 networks:

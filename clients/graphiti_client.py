@@ -12,6 +12,7 @@ Handles graph memory storage and retrieval.
 
 from graphiti_core import Graphiti
 from graphiti_core.llm_client.config import LLMConfig
+from graphiti_core.llm_client.openai_generic_client import OpenAIGenericClient
 from sentence_transformers import SentenceTransformer
 from typing import Optional, List
 import logging
@@ -19,11 +20,14 @@ import asyncio
 from datetime import datetime
 from clients.hosted_embedder import HostedQwenEmbedder
 
-from graphiti_core.llm_client.openai_generic_client import OpenAIGenericClient
 from graphiti_core.cross_encoder.bge_reranker_client import BGERerankerClient
 
 # Try to import EmbedderClient
 from graphiti_core.embedder import EmbedderClient
+
+# Import reranker clients
+from clients.noop_reranker import NoOpRerankerClient
+from clients.hosted_reranker import HostedRerankerClient
 
 from config.settings import settings
 
@@ -145,8 +149,8 @@ class GraphitiClient:
             max_tokens=settings.graphiti_max_episode_length
         )
 
-        # Create OpenAIGenericClient для Graphiti
-        # Важно: передаем только config, НЕ client!
+        # Create LiteLLM-compatible client для Graphiti
+        # Uses custom wrapper that fixes message roles for LiteLLM compatibility
         graphiti_llm = OpenAIGenericClient(config=llm_config)
 
         # Create embedder (hosted or local)
@@ -157,12 +161,33 @@ class GraphitiClient:
             logger.info("Using local sentence-transformers embeddings")
             embedder = CustomEmbedder()
 
-        # Create local reranker (BGE cross-encoder)
-        # BGERerankerClient використовує sentence-transformers локально
-        # і не потребує OpenAI API
-        reranker = BGERerankerClient()
+        # Create reranker based on settings
+        # IMPORTANT: Never pass None to Graphiti, as it will try to create
+        # OpenAIRerankerClient which requires OPENAI_API_KEY
 
-        # Initialize Graphiti
+        # Legacy support: USE_RERANKER=true -> use BGE
+        if settings.use_reranker and settings.reranker_type == "noop":
+            reranker_type = "bge"
+        else:
+            reranker_type = settings.reranker_type.lower()
+
+        if reranker_type == "bge":
+            # BGE cross-encoder: accurate but VERY slow on CPU
+            logger.info("🐢 Using BGE cross-encoder reranker (slow but accurate)")
+            reranker = BGERerankerClient()
+        elif reranker_type == "hosted":
+            # Hosted reranker: uses Lapathon API (medium speed)
+            logger.info("🌐 Using hosted API reranker (medium speed, API-based)")
+            reranker = HostedRerankerClient(
+                use_logprobs=settings.reranker_use_logprobs,
+                max_concurrent=settings.reranker_max_concurrent
+            )
+        else:
+            # NoOp reranker: returns passages in original order (fast)
+            logger.info("🚀 Using NoOp reranker (maximum speed, no reranking)")
+            reranker = NoOpRerankerClient()
+
+        # Initialize Graphiti with parallelization config
         # Увага: database параметр не підтримується конструктором
         # Використовуємо лише uri, user, password
         self.graphiti = Graphiti(
@@ -171,16 +196,13 @@ class GraphitiClient:
             password=self.neo4j_password,
             llm_client=graphiti_llm,
             embedder=embedder,
-            cross_encoder=reranker
+            cross_encoder=reranker,
+            # Паралелізація LLM та embedding calls
+            max_coroutines=settings.graphiti_max_concurrent_llm,
         )
 
-        # Build indices on first run
-        # Правильна назва методу: build_indices_and_constraints()
-        try:
-            await self.graphiti.build_indices_and_constraints()
-            logger.info("Graphiti indices and constraints built successfully")
-        except Exception as e:
-            logger.warning(f"Index building failed (may already exist): {e}")
+        # Note: build_indices_and_constraints() is now called once
+        # in app.py lifespan handler to avoid repeated builds per request
         self._initialized = True
         logger.info("Graphiti client initialized successfully")
 
@@ -215,6 +237,52 @@ class GraphitiClient:
             logger.info(f"Episode added: {episode_name}")
         except Exception as e:
             logger.error(f"Failed to add episode: {e}", exc_info=True)
+            raise
+
+    async def add_episode_with_facts(
+        self,
+        episode_name: str,
+        episode_body: str,
+        source_description: str,
+        reference_time: Optional[datetime] = None
+    ):
+        """
+        Add episode with pre-extracted facts as JSON string.
+        
+        This method uses EpisodeType.json to pass pre-extracted facts as a
+        JSON-serialized string, allowing Graphiti to process structured data
+        without full text extraction, resulting in ~26s performance improvement.
+        
+        Args:
+            episode_name: Episode identifier
+            episode_body: JSON string with pre-extracted facts
+            source_description: Source info (e.g., "user:123, uid:abc")
+            reference_time: Temporal context (datetime object)
+            
+        Returns:
+            Episode object with nodes and edges
+            
+        Reference:
+            https://help.getzep.com/graphiti/core-concepts/adding-episodes
+        """
+        from graphiti_core.nodes import EpisodeType
+        
+        if not self._initialized or self.graphiti is None:
+            raise RuntimeError("Graphiti not initialized. Call initialize() first.")
+        
+        try:
+            # Pass JSON string with EpisodeType.json for optimized processing
+            episode = await self.graphiti.add_episode(
+                name=episode_name,
+                episode_body=episode_body,  # JSON string (not dict!)
+                source=EpisodeType.json,
+                source_description=source_description,
+                reference_time=reference_time
+            )
+            logger.info(f"✓ Episode added with structured JSON: {episode_name}")
+            return episode
+        except Exception as e:
+            logger.error(f"Failed to add episode with facts: {e}", exc_info=True)
             raise
 
     async def search(

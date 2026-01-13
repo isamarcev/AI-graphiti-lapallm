@@ -71,6 +71,14 @@ class Settings(BaseSettings):
         default=0.7,
         description="Minimum relevance score for retrieved memories"
     )
+    graphiti_max_concurrent_llm: int = Field(
+        default=10,
+        description="Max concurrent LLM calls in Graphiti (for entity processing parallelization)"
+    )
+    graphiti_max_concurrent_embeddings: int = Field(
+        default=20,
+        description="Max concurrent embedding calls in Graphiti"
+    )
 
     # Embeddings Configuration
     embedding_model_name: str = Field(
@@ -84,6 +92,24 @@ class Settings(BaseSettings):
     use_hosted_embeddings: bool = Field(
         default=False,
         description="Use hosted Qwen embeddings instead of local sentence-transformers"
+    )
+
+    # Reranking Configuration
+    use_reranker: bool = Field(
+        default=False,
+        description="Enable BGE cross-encoder reranking (significantly slower on CPU, improves relevance)"
+    )
+    reranker_type: str = Field(
+        default="noop",
+        description="Reranker type: 'noop' (fast, no reranking), 'bge' (slow, local), 'hosted' (medium, API-based)"
+    )
+    reranker_use_logprobs: bool = Field(
+        default=True,
+        description="Use logprobs for hosted reranker scoring (more accurate but requires API support)"
+    )
+    reranker_max_concurrent: int = Field(
+        default=10,
+        description="Maximum concurrent API calls for hosted reranker (10-20 recommended for best performance)"
     )
 
     # Agent Configuration
@@ -153,6 +179,20 @@ class Settings(BaseSettings):
     log_level: str = Field(
         default="INFO",
         description="Logging level (DEBUG, INFO, WARNING, ERROR)"
+    )
+
+    # Phoenix Observability Configuration
+    enable_phoenix: bool = Field(
+        default=True,
+        description="Enable Phoenix observability and tracing"
+    )
+    phoenix_collector_endpoint: str = Field(
+        default="http://phoenix:6006",
+        description="Phoenix collector endpoint for traces"
+    )
+    phoenix_project_name: str = Field(
+        default="graphiti-lapa-agent",
+        description="Project name for Phoenix traces"
     )
 
 

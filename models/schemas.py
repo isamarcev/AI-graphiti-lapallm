@@ -209,3 +209,63 @@ class KnowledgeGraphEdge(BaseModel):
         default_factory=datetime.now,
         description="Creation timestamp"
     )
+
+
+class RetrievedContext(BaseModel):
+    """
+    Typed structure for retrieved context from Graphiti.
+    Used in SOLVE path after retrieval.
+    """
+
+    content: str = Field(
+        description="Retrieved text content from memory"
+    )
+    source_msg_uid: str = Field(
+        description="UID of the message that is the source of this content"
+    )
+    timestamp: Optional[datetime] = Field(
+        default=None,
+        description="When this content was originally stored"
+    )
+    score: float = Field(
+        default=1.0,
+        ge=0.0,
+        le=1.0,
+        description="Relevance score from retrieval (0.0 to 1.0)"
+    )
+
+
+class ReactStep(BaseModel):
+    """
+    Typed structure for a single ReAct reasoning step.
+    Used in SOLVE path during react_loop.
+    """
+
+    thought: str = Field(
+        description="Agent's thought/reasoning at this step"
+    )
+    action: str = Field(
+        description="Action decided (e.g. 'search', 'answer', 'refine')"
+    )
+    observation: Optional[str] = Field(
+        default=None,
+        description="Result/observation from executing the action"
+    )
+
+
+class SolveResponse(BaseModel):
+    """
+    Structured output schema для SOLVE response.
+    Використовується для гарантії формату відповіді від LLM.
+    """
+
+    response: str = Field(
+        description="Фінальна відповідь на запит користувача українською мовою"
+    )
+    referenced_sources: List[str] = Field(
+        description="Список UID джерел у форматі msg-XXX, які були використані у відповіді",
+        default_factory=list
+    )
+    has_sufficient_info: bool = Field(
+        description="True якщо в джерелах була достатня інформація, False якщо ні"
+    )

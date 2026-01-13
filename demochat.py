@@ -1,19 +1,25 @@
 #!/usr/bin/env python3
 """
-Simple interactive chat with memory-enabled agent.
+Interactive chat з knowledge-centered agent (TEACH/SOLVE flow).
+
+Використовує production agent через /text endpoint logic:
+- TEACH: навчання агента новим фактам
+- SOLVE: відповіді на питання з використанням збережених знань
 
 Usage:
     python demochat.py
+
+Legacy version: demochat_legacy.py
 """
 
 import asyncio
 import sys
-from datetime import datetime
-from langchain_core.messages import HumanMessage
+from uuid import uuid4
 
-from config.settings import settings
+from routers.text import process_text
+from routers.schemas import TextRequest
 from clients.graphiti_client import get_graphiti_client
-from agent.graph import get_agent_app
+from config.settings import settings
 
 
 # ANSI color codes for pretty output
@@ -26,14 +32,19 @@ class Colors:
     MAGENTA = '\033[95m'
     BOLD = '\033[1m'
     RESET = '\033[0m'
+    GRAY = '\033[90m'
 
 
 def print_banner():
     """Print welcome banner."""
     banner = f"""
-{Colors.CYAN}{'=' * 60}
-{Colors.BOLD}🤖 LAPA AI CHAT - Агент з довготривалою пам'яттю{Colors.RESET}
-{Colors.CYAN}{'=' * 60}{Colors.RESET}
+{Colors.CYAN}{'=' * 70}
+{Colors.BOLD}🤖 LAPA AI CHAT - Knowledge-Centered Agent{Colors.RESET}
+{Colors.CYAN}{'=' * 70}{Colors.RESET}
+
+{Colors.YELLOW}Цей агент може:{Colors.RESET}
+  🎓 {Colors.GREEN}НАВЧАТИСЯ{Colors.RESET} - зберігає факти які ви йому повідомляєте
+  💡 {Colors.GREEN}ВІДПОВІДАТИ{Colors.RESET} - використовує збережені знання для відповідей
 
 {Colors.YELLOW}Команди:{Colors.RESET}
   {Colors.GREEN}/exit{Colors.RESET}   - Вийти з чату
@@ -41,9 +52,16 @@ def print_banner():
   {Colors.GREEN}/stats{Colors.RESET}  - Показати статистику пам'яті
   {Colors.GREEN}/help{Colors.RESET}   - Показати цю довідку
 
+{Colors.YELLOW}Приклади:{Colors.RESET}
+  {Colors.GRAY}TEACH: "Мене звати Ігор, я з Києва"
+  {Colors.GRAY}SOLVE: "Як мене звати?"
+  {Colors.GRAY}TEACH: "Столиця України - Київ"
+  {Colors.GRAY}SOLVE: "Яка столиця України?"{Colors.RESET}
+
 {Colors.MAGENTA}Модель:{Colors.RESET} {settings.vllm_model_name}
-{Colors.MAGENTA}Embeddings:{Colors.RESET} {settings.embedding_model_name}
-{Colors.CYAN}{'=' * 60}{Colors.RESET}
+{Colors.MAGENTA}Embeddings:{Colors.RESET} {'Hosted Qwen' if settings.use_hosted_embeddings else settings.embedding_model_name}
+{Colors.MAGENTA}Reranking:{Colors.RESET} {'Enabled 🐢' if settings.use_reranker else 'Disabled 🚀'}
+{Colors.CYAN}{'=' * 70}{Colors.RESET}
 """
     print(banner)
 
@@ -53,9 +71,31 @@ def print_user(message: str):
     print(f"\n{Colors.BLUE}{Colors.BOLD}Ви:{Colors.RESET} {message}")
 
 
-def print_agent(message: str):
-    """Print agent response."""
-    print(f"{Colors.GREEN}{Colors.BOLD}Агент:{Colors.RESET} {message}\n")
+def print_agent(response: str, intent: str = None, references: list = None, reasoning: str = None):
+    """Print agent response with metadata."""
+    # Intent badge
+    if intent == "teach":
+        intent_badge = f"{Colors.YELLOW}[НАВЧАННЯ]{Colors.RESET}"
+    elif intent == "solve":
+        intent_badge = f"{Colors.CYAN}[ВІДПОВІДЬ]{Colors.RESET}"
+    else:
+        intent_badge = ""
+
+    print(f"{Colors.GREEN}{Colors.BOLD}Агент:{Colors.RESET} {intent_badge}")
+    print(f"{response}")
+
+    # References
+    if references and len(references) > 0:
+        refs_str = ", ".join(references[:3])  # Show max 3
+        if len(references) > 3:
+            refs_str += f" (+{len(references) - 3} more)"
+        print(f"{Colors.GRAY}📎 References: {refs_str}{Colors.RESET}")
+
+    # Reasoning (if available)
+    if reasoning:
+        print(f"{Colors.GRAY}💭 Reasoning: {reasoning[:100]}...{Colors.RESET}")
+
+    print()
 
 
 def print_system(message: str):
@@ -68,16 +108,24 @@ def print_error(message: str):
     print(f"{Colors.RED}[Помилка]{Colors.RESET} {message}")
 
 
-async def show_stats(graphiti_client):
+async def show_stats():
     """Show graph memory statistics."""
     try:
-        stats = await graphiti_client.get_graph_stats()
-        print(f"\n{Colors.CYAN}{'=' * 60}")
-        print(f"{Colors.BOLD}📊 Статистика пам'яті{Colors.RESET}")
-        print(f"{Colors.CYAN}{'=' * 60}{Colors.RESET}")
-        print(f"  Вузлів (Entity): {Colors.GREEN}{stats['node_count']}{Colors.RESET}")
-        print(f"  Зв'язків (Relations): {Colors.GREEN}{stats['relationship_count']}{Colors.RESET}")
-        print(f"{Colors.CYAN}{'=' * 60}{Colors.RESET}\n")
+        graphiti = await get_graphiti_client()
+        stats = await graphiti.get_graph_stats()
+
+        print(f"\n{Colors.CYAN}{'=' * 70}")
+        print(f"{Colors.BOLD}📊 Статистика Knowledge Graph{Colors.RESET}")
+        print(f"{Colors.CYAN}{'=' * 70}{Colors.RESET}")
+        print(f"  🔷 Вузлів (Entities): {Colors.GREEN}{stats['node_count']}{Colors.RESET}")
+        print(f"  🔗 Зв'язків (Relations): {Colors.GREEN}{stats['relationship_count']}{Colors.RESET}")
+
+        # Calculate knowledge richness
+        if stats['node_count'] > 0:
+            avg_relations = stats['relationship_count'] / stats['node_count']
+            print(f"  📈 Середньо зв'язків на вузол: {Colors.GREEN}{avg_relations:.1f}{Colors.RESET}")
+
+        print(f"{Colors.CYAN}{'=' * 70}{Colors.RESET}\n")
     except Exception as e:
         print_error(f"Не вдалося отримати статистику: {e}")
 
@@ -86,34 +134,28 @@ async def main():
     """Main chat loop."""
     print_banner()
 
-    # Get chat session name from user
-    print(f"{Colors.MAGENTA}Введіть назву чату{Colors.RESET} (наприклад: робота, навчання, особисте):")
-    session_name = input(f"{Colors.BOLD}> {Colors.RESET}").strip()
+    # Get user ID
+    print(f"{Colors.MAGENTA}Введіть ваш ID{Colors.RESET} (або залиште порожнім для 'demo_user'):")
+    user_id = input(f"{Colors.BOLD}> {Colors.RESET}").strip()
 
-    if not session_name:
-        session_name = f"chat_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-        print_system(f"Використовується автоматична назва: {session_name}")
+    if not user_id:
+        user_id = "demo_user"
+        print_system(f"Використовується ID: {user_id}")
 
-    # Generate session ID and user ID
-    session_id = f"session_{session_name}"
-    user_id = "user_1"  # Can be customized if needed
-
-    print_system(f"Чат почато: {Colors.BOLD}{session_name}{Colors.RESET}")
-    print_system(f"Всі розмови будуть збережені в граф пам'яті")
+    print_system(f"Чат почато для користувача: {Colors.BOLD}{user_id}{Colors.RESET}")
+    print_system(f"Всі знання будуть збережені в Graphiti knowledge graph")
     print_system(f"Введіть {Colors.GREEN}/help{Colors.RESET} для списку команд\n")
 
-    # Initialize agent and graphiti
+    # Initialize agent (check if it works)
     try:
-        print_system("Ініціалізація агента...")
-        agent = get_agent_app()
+        print_system("Ініціалізація knowledge-centered agent...")
         graphiti = await get_graphiti_client()
-        print_system(f"✅ Агент готовий!\n")
+        print_system(f"✅ Агент готовий! Graphiti підключено.\n")
     except Exception as e:
         print_error(f"Не вдалося ініціалізувати агента: {e}")
+        print_system("Перевірте чи запущено Neo4j: docker-compose up -d")
         return
 
-    # Chat configuration
-    config = {"configurable": {"thread_id": session_id}}
     message_count = 0
 
     # Main chat loop
@@ -131,7 +173,7 @@ async def main():
                 command = user_input.lower()
 
                 if command == '/exit' or command == '/quit':
-                    print_system(f"Дякую за розмову! Всього {message_count} повідомлень збережено.")
+                    print_system(f"Дякую за розмову! Всього {message_count} повідомлень оброблено.")
                     print_system("До побачення! 👋\n")
                     break
 
@@ -139,11 +181,11 @@ async def main():
                     # Clear screen
                     print('\033[2J\033[H', end='')
                     print_banner()
-                    print_system(f"Продовжуємо чат: {Colors.BOLD}{session_name}{Colors.RESET}\n")
+                    print_system(f"Продовжуємо чат для: {Colors.BOLD}{user_id}{Colors.RESET}\n")
                     continue
 
                 elif command == '/stats':
-                    await show_stats(graphiti)
+                    await show_stats()
                     continue
 
                 elif command == '/help':
@@ -155,55 +197,46 @@ async def main():
                     print_system(f"Введіть /help для списку команд")
                     continue
 
-            # Process user message with agent
+            # Process user message with knowledge-centered agent
             try:
-                # Clean user input from potential encoding issues
-                try:
-                    user_input = user_input.encode('utf-8', errors='ignore').decode('utf-8', errors='ignore')
-                except Exception:
-                    pass
+                # Generate unique message UID
+                msg_uid = f"msg_{uuid4().hex[:8]}"
 
-                message = HumanMessage(content=user_input)
-
-                # Invoke agent
-                result = await agent.ainvoke(
-                    {
-                        "messages": [message],
-                        "user_id": user_id,
-                        "session_id": session_id,
-                        "retrieved_context": None,
-                        "timestamp": datetime.now(),
-                        "current_query": None,
-                        "needs_memory_update": False,
-                        "search_results": None,
-                        "message_count": message_count
-                    },
-                    config=config
+                # Create request
+                request = TextRequest(
+                    uid=msg_uid,
+                    text=user_input,
+                    user_id=user_id
                 )
 
-                # Get agent response
-                agent_response = result['messages'][-1].content
+                # Show processing indicator
+                print(f"{Colors.GRAY}⏳ Обробка...{Colors.RESET}", end='\r')
 
-                # Clean response from potential encoding issues
-                try:
-                    agent_response = agent_response.encode('utf-8', errors='ignore').decode('utf-8', errors='ignore')
-                except Exception:
-                    pass
+                # Process through agent
+                response = await process_text(request)
 
-                print_agent(agent_response)
+                # Clear processing indicator
+                print(' ' * 50, end='\r')
+
+                # Display response
+                print_agent(
+                    response=response.response,
+                    intent=None,  # Intent not exposed in TextResponse
+                    references=response.references,
+                    reasoning=response.reasoning
+                )
 
                 message_count += 1
 
-            except UnicodeEncodeError as e:
-                print_error(f"Помилка кодування тексту: {e}")
-                print_system("Hosted API повернув некоректні символи. Спробуйте переформулювати запит.")
             except Exception as e:
                 print_error(f"Помилка обробки повідомлення: {e}")
                 print_system("Спробуйте ще раз або введіть /exit для виходу")
+                import traceback
+                print(f"{Colors.GRAY}{traceback.format_exc()}{Colors.RESET}")
 
         except KeyboardInterrupt:
             print_system("\n\nПерервано користувачем (Ctrl+C)")
-            print_system(f"Всього {message_count} повідомлень збережено.")
+            print_system(f"Всього {message_count} повідомлень оброблено.")
             print_system("До побачення! 👋\n")
             break
 

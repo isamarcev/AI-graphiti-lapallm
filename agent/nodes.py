@@ -4,6 +4,7 @@ Defines the processing steps: retrieve → generate → save.
 """
 
 import logging
+import time
 from datetime import datetime
 from langchain_core.messages import HumanMessage, AIMessage
 from typing import Dict, Any
@@ -47,16 +48,28 @@ async def retrieve_memory_node(state: AgentState) -> Dict[str, Any]:
 
     logger.info(f"User query: {user_message[:100]}...")
 
+    # === PROFILING START ===
+    start_total = time.time()
+
     try:
         # Get Graphiti client
+        start_client = time.time()
         graphiti = await get_graphiti_client()
+        time_client = time.time() - start_client
+        logger.info(f"⏱️  Graphiti client init: {time_client:.3f}s")
 
         # Search for relevant memories
+        start_search = time.time()
         search_results = await graphiti.search(
             query=user_message,
             limit=settings.graphiti_search_limit,
             relevance_threshold=settings.graphiti_relevance_threshold
         )
+        time_search = time.time() - start_search
+
+        # Log search time with reranker status
+        reranker_status = "WITH reranking" if settings.use_reranker else "WITHOUT reranking"
+        logger.info(f"⏱️  Search ({reranker_status}): {time_search:.3f}s")
 
         # Format retrieved context
         if search_results:
@@ -72,6 +85,10 @@ async def retrieve_memory_node(state: AgentState) -> Dict[str, Any]:
             retrieved_context = "Немає релевантних спогадів з попередніх розмов."
             logger.info("No relevant memories found")
 
+        # === PROFILING END ===
+        total_time = time.time() - start_total
+        logger.info(f"⏱️  TOTAL retrieval time: {total_time:.3f}s")
+
         return {
             "retrieved_context": retrieved_context,
             "search_results": search_results,
@@ -79,7 +96,9 @@ async def retrieve_memory_node(state: AgentState) -> Dict[str, Any]:
         }
 
     except Exception as e:
-        logger.error(f"Error retrieving memory: {e}")
+        # Log error with timing
+        total_time = time.time() - start_total
+        logger.error(f"Error retrieving memory: {e} (took {total_time:.3f}s)")
         return {
             "retrieved_context": "Помилка при отриманні контексту.",
             "search_results": [],

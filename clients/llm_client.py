@@ -63,14 +63,42 @@ class LLMClient:
         else:
             logger.info(f"Using vLLM at {self.base_url} with model {self.model_name}")
 
-        # Initialize async and sync clients
+        # Initialize async and sync clients з timeout для швидкості
+        import httpx
+
+        # HTTP client з оптимізованим timeout для швидкості
+        # ВАЖЛИВО: для hosted API потрібен більший timeout для knowledge extraction
+        http_client = httpx.AsyncClient(
+            timeout=httpx.Timeout(
+                timeout=120.0,  # 120s total timeout
+                connect=10.0,   # 10s to establish connection
+                read=120.0,     # 120s to read response (для knowledge extraction з великими промптами)
+                write=10.0      # 10s to write request
+            ),
+            limits=httpx.Limits(max_keepalive_connections=10, max_connections=20)
+        )
+
         self.async_client = AsyncOpenAI(
             base_url=self.base_url,
-            api_key=self.api_key
+            api_key=self.api_key,
+            http_client=http_client,
+            max_retries=0  # Без retry для швидкості
         )
+
+        sync_http_client = httpx.Client(
+            timeout=httpx.Timeout(
+                timeout=120.0,
+                connect=10.0,
+                read=120.0,
+                write=10.0
+            )
+        )
+
         self.sync_client = OpenAI(
             base_url=self.base_url,
-            api_key=self.api_key
+            api_key=self.api_key,
+            http_client=sync_http_client,
+            max_retries=0
         )
 
     @traceable(name="llm_generate")
@@ -135,6 +163,23 @@ class LLMClient:
                     # Fallback: replace known problematic characters
                     content = content.replace('\udcd1', '').replace('\udcd0', '')
 
+            # Add input/output to OpenTelemetry span for Phoenix
+            try:
+                from opentelemetry import trace
+                current_span = trace.get_current_span()
+                if current_span and current_span.is_recording():
+                    # Set input messages
+                    import json as json_module
+                    current_span.set_attribute("llm.input_messages", json_module.dumps(messages))
+                    # Set output
+                    current_span.set_attribute("llm.output_messages", json_module.dumps([{"role": "assistant", "content": content}]))
+                    # Set model info
+                    current_span.set_attribute("llm.model", self.model_name)
+                    current_span.set_attribute("llm.temperature", temperature)
+                    current_span.set_attribute("llm.max_tokens", max_tokens)
+            except Exception as e:
+                logger.debug(f"Could not add span attributes: {e}")
+
             # Log token usage for debugging/monitoring
             if hasattr(response, 'usage') and response.usage:
                 usage_info = {
@@ -143,6 +188,29 @@ class LLMClient:
                     "total_tokens": response.usage.total_tokens
                 }
                 logger.info(f"Token usage: {usage_info}")
+
+                # Add token usage to OpenTelemetry span
+                try:
+                    from opentelemetry import trace
+                    current_span = trace.get_current_span()
+                    if current_span and current_span.is_recording():
+                        current_span.set_attribute("llm.usage.prompt_tokens", response.usage.prompt_tokens)
+                        current_span.set_attribute("llm.usage.completion_tokens", response.usage.completion_tokens)
+                        current_span.set_attribute("llm.usage.total_tokens", response.usage.total_tokens)
+                except Exception as e:
+                    logger.debug(f"Could not add token usage to span: {e}")
+
+                # Add cost tracking to Phoenix span
+                try:
+                    from config.cost_tracking import add_cost_to_span
+                    add_cost_to_span(
+                        model=self.model_name,
+                        prompt_tokens=response.usage.prompt_tokens,
+                        completion_tokens=response.usage.completion_tokens,
+                        is_embedding=False
+                    )
+                except Exception as e:
+                    logger.debug(f"Could not add cost to span: {e}")
 
                 # Add token metadata to LangSmith trace if available
                 if get_current_run_tree:
