@@ -145,7 +145,7 @@ class GraphitiClient:
             api_key=settings.api_key,  # vLLM не требует настоящий API ключ
             model=settings.model_name,
             small_model=settings.model_name,  # Используем ту же модель
-            base_url=settings.base_url,
+            base_url=settings.lapa_url,
             temperature=settings.graphiti_temperature,  # Lower temp for structured outputs
             max_tokens=settings.graphiti_max_episode_length
         )

@@ -462,7 +462,7 @@ agent:
 
 ## 📚 Документація
 
-- **[QUICKSTART.md](QUICKSTART.md)** - швидкий старт за 3 команди
+- **[QUICKSTART.md](docs/QUICKSTART.mdRT.md)** - швидкий старт за 3 команди
 - **[DOCKER_SETUP.md](docs/DOCKER_SETUP.mdUP.md)** - детальний Docker setup
 - **[DOCKER_DEPLOYMENT.md](docs/DOCKER_DEPLOYMENT.mdNT.md)** - production deployment
 - **[TABULA_RASA_IMPLEMENTATION.md](TABULA_RASA_IMPLEMENTATION.md)** - імплементація змін
@@ -639,7 +639,7 @@ Response includes `references` with source message UIDs.
 
 ## 📚 Documentation
 
-- **[QUICKSTART.md](QUICKSTART.md)** - 3-command quick start
+- **[QUICKSTART.md](docs/QUICKSTART.mdRT.md)** - 3-command quick start
 - **[DOCKER_SETUP.md](docs/DOCKER_SETUP.mdUP.md)** - detailed Docker setup
 - **[TABULA_RASA_TESTING.md](TABULA_RASA_TESTING.md)** - testing scenarios
 

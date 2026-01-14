@@ -18,10 +18,10 @@ class Settings(BaseSettings):
         extra="ignore"
     )
 
-    # vLLM / LLM Configuration
-    base_url: str = Field(
+    # LLM Configuration
+    lapa_url: str = Field(
         default="http://localhost:8000/v1",
-        description="vLLM server base URL with OpenAI-compatible API"
+        description="OpenAI-compatible API"
     )
     api_key: str = Field(
         default="EMPTY",

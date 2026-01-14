@@ -40,7 +40,7 @@ class LLMClient:
             api_key: API key (use "EMPTY" for vLLM, actual key for OpenAI)
             model_name: Model name to use
         """
-        self.base_url = base_url or settings.base_url
+        self.base_url = base_url or settings.lapa_url
         self.api_key = api_key or settings.api_key
         self.model_name = model_name or settings.model_name
 
