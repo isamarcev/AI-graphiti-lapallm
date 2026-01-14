@@ -6,52 +6,42 @@ Instrumentation для LangChain, OpenAI та custom metrics.
 import os
 import logging
 from typing import Optional
+# Import Phoenix OTEL components
+from openinference.instrumentation.langchain import LangChainInstrumentor
+from openinference.instrumentation.openai import OpenAIInstrumentor
+from opentelemetry import trace
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import BatchSpanProcessor
+from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+from opentelemetry.sdk.resources import Resource
+
+from config.settings import Settings, get_settings
 
 logger = logging.getLogger(__name__)
 
 
 def setup_phoenix_instrumentation(
-    collector_endpoint: Optional[str] = None,
-    project_name: Optional[str] = None
 ) -> bool:
     """
     Setup Phoenix instrumentation для tracing LLM calls та retrieval.
 
     Args:
-        collector_endpoint: Phoenix collector URL (default: from env)
-        project_name: Project name для Phoenix (default: from env)
+        settings: Settings with vars
 
     Returns:
         True if successfully configured, False otherwise
     """
+
     try:
-        # OPTIMIZATION: Check if Phoenix is enabled
-        enable_phoenix = os.getenv("ENABLE_PHOENIX", "true").lower() == "true"
-        if not enable_phoenix:
+        settings = get_settings()
+        if not settings.enable_phoenix:
             logger.info("Phoenix instrumentation disabled via ENABLE_PHOENIX=false")
             return False
 
-        # Get configuration from environment
-        # NOTE: Phoenix register() automatically adds /v1/traces, so use base URL only
-        collector_endpoint = collector_endpoint or os.getenv(
-            "PHOENIX_COLLECTOR_ENDPOINT",
-            "http://phoenix:6006"  # Base URL without /v1/traces
-        )
-        project_name = project_name or os.getenv(
-            "PHOENIX_PROJECT_NAME",
-            "graphiti-lapa-agent"
-        )
+        collector_endpoint = settings.phoenix_collector_endpoint
+        project_name = settings.phoenix_project_name
 
         logger.info(f"Setting up Phoenix instrumentation: {collector_endpoint}")
-
-        # Import Phoenix OTEL components
-        from openinference.instrumentation.langchain import LangChainInstrumentor
-        from openinference.instrumentation.openai import OpenAIInstrumentor
-        from opentelemetry import trace
-        from opentelemetry.sdk.trace import TracerProvider
-        from opentelemetry.sdk.trace.export import BatchSpanProcessor
-        from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
-        from opentelemetry.sdk.resources import Resource
 
         # Create resource with project name
         resource = Resource.create({

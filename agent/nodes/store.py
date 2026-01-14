@@ -53,7 +53,7 @@ Assistant: {assistant_message}"""
         logger.info(f"Adding episode to Graphiti: {episode_name}")
         logger.info(f"Episode body:\n{episode_body}")
 
-        episode = await graphiti.add_episode(
+        result = await graphiti.add_episode(
             episode_body=episode_body,
             episode_name=episode_name,
             source_description=f"user:{state['user_id']}, uid:{state['message_uid']}",
@@ -61,18 +61,22 @@ Assistant: {assistant_message}"""
         )
 
         # Extract episode result info
+        episode = result.episode if hasattr(result, 'episode') else result
         episode_id = episode.uuid if hasattr(episode, 'uuid') else episode_name
         logger.info(f"✓ Episode saved with ID: {episode_id}")
 
         # Log extracted entities and relations (if available)
-        if hasattr(episode, 'nodes') and episode.nodes:
-            entity_names = [node.name for node in episode.nodes if hasattr(node, 'name')]
+        nodes = result.nodes if hasattr(result, 'nodes') else []
+        edges = result.edges if hasattr(result, 'edges') else []
+
+        if nodes:
+            entity_names = [node.name for node in nodes if hasattr(node, 'name')]
             logger.info(f"📦 Extracted {len(entity_names)} entities: {entity_names}")
 
-        if hasattr(episode, 'edges') and episode.edges:
+        if edges:
             relations = [
                 f"{edge.source_node_name} -> {edge.name} -> {edge.target_node_name}"
-                for edge in episode.edges
+                for edge in edges
                 if hasattr(edge, 'name') and hasattr(edge, 'source_node_name') and hasattr(edge, 'target_node_name')
             ]
             logger.info(f"🔗 Extracted {len(relations)} relations: {relations}")
@@ -91,7 +95,7 @@ Assistant: {assistant_message}"""
         logger.info(f"✓ Message saved to Neo4j and linked to episode")
 
         # 3. Prepare response
-        entity_count = len(episode.nodes) if hasattr(episode, 'nodes') else 0
+        entity_count = len(nodes)
         response = f"✓ Навчання збережено.\n\nВивчено {entity_count} сутностей з повідомлення {state['message_uid']}."
 
         return {

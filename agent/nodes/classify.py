@@ -7,7 +7,6 @@ Uses DSPy framework for declarative LLM programming.
 import logging
 from typing import Dict, Any
 import dspy
-from dspy import Signature, InputField, OutputField
 
 from agent.state import AgentState
 from config.settings import settings
@@ -50,13 +49,13 @@ def _get_dspy_lm():
         # Використовуємо Lapa LLM через OpenAI-compatible API
         # LiteLLM потребує формат: openai/модель для OpenAI-compatible API
         _dspy_lm = dspy.LM(
-            model=f"openai/{settings.vllm_model_name}",  # "openai/lapa" для LiteLLM
-            api_key=settings.vllm_api_key or "EMPTY",
-            api_base=settings.vllm_base_url,
+            model=f"openai/{settings.model_name}",  # "openai/lapa" для LiteLLM
+            api_key=settings.api_key or "EMPTY",
+            api_base=settings.lapa_url,
             model_type="chat"
         )
         dspy.configure(lm=_dspy_lm, temperature=0.1)
-        logger.info(f"DSPy LM configured: {settings.vllm_base_url} with model {settings.vllm_model_name}")
+        logger.info(f"DSPy LM configured: {settings.lapa_url} with model {settings.model_name}")
     return _dspy_lm
 
 

@@ -58,12 +58,12 @@ class HostedRerankerClient(CrossEncoderClient):
             max_concurrent: Maximum concurrent API requests
         """
         # Strip /v1 suffix if present
-        self.base_url = (base_url or settings.vllm_base_url).rstrip('/')
+        self.base_url = (base_url or settings.lapa_url).rstrip('/')
         if not self.base_url.endswith('/v1'):
             self.base_url += '/v1'
 
-        self.api_key = api_key or settings.vllm_api_key
-        self.model_name = model_name or settings.vllm_model_name
+        self.api_key = api_key or settings.api_key
+        self.model_name = model_name or settings.model_name
         self.use_logprobs = use_logprobs
         self.max_concurrent = max_concurrent
 

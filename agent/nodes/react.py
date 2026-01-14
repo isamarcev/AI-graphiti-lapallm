@@ -7,7 +7,6 @@ import logging
 from typing import Dict, Any, List
 
 from agent.state import AgentState
-from agent.helpers import extract_search_query, format_search_results
 from clients.llm_client import get_llm_client
 from clients.graphiti_client import get_graphiti_client
 from config.settings import settings
@@ -123,7 +122,7 @@ async def react_loop_node(state: AgentState) -> Dict[str, Any]:
             action = "search"
 
             # Extract search query from thought
-            search_query = extract_search_query(thought)
+            search_query = thought # todo rework
             logger.info(f"Action: {action} - Query: {search_query}")
 
             # Search for additional context
@@ -133,7 +132,7 @@ async def react_loop_node(state: AgentState) -> Dict[str, Any]:
                     limit=3
                 )
 
-                observation = format_search_results(search_results)
+                observation = search_results # todo rework
                 logger.info(f"Observation: Found {len(search_results)} results")
 
                 # Add new results to context

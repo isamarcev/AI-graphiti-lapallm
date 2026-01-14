@@ -12,13 +12,13 @@ Handles graph memory storage and retrieval.
 
 from graphiti_core import Graphiti
 from graphiti_core.llm_client.config import LLMConfig
-from graphiti_core.llm_client.openai_generic_client import OpenAIGenericClient
 from sentence_transformers import SentenceTransformer
 from typing import Optional, List
 import logging
 import asyncio
 from datetime import datetime
 from clients.hosted_embedder import HostedQwenEmbedder
+from clients.graphiti_client_wrapper import FixedOpenAIGenericClient
 
 from graphiti_core.cross_encoder.bge_reranker_client import BGERerankerClient
 
@@ -140,18 +140,21 @@ class GraphitiClient:
 
         # Create LLMConfig for vLLM/Ollama
         # OpenAIGenericClient работает с OpenAI-compatible endpoints
+        # Use lower temperature (0.0) for more stable JSON generation
         llm_config = LLMConfig(
-            api_key=settings.vllm_api_key,  # vLLM не требует настоящий API ключ
-            model=settings.vllm_model_name,
-            small_model=settings.vllm_model_name,  # Используем ту же модель
-            base_url=settings.vllm_base_url,
-            temperature=settings.llm_temperature,
+            api_key=settings.api_key,  # vLLM не требует настоящий API ключ
+            model=settings.model_name,
+            small_model=settings.model_name,  # Используем ту же модель
+            base_url=settings.lapa_url,
+            temperature=settings.graphiti_temperature,  # Lower temp for structured outputs
             max_tokens=settings.graphiti_max_episode_length
         )
 
         # Create LiteLLM-compatible client для Graphiti
         # Uses custom wrapper that fixes message roles for LiteLLM compatibility
-        graphiti_llm = OpenAIGenericClient(config=llm_config)
+        # FixedOpenAIGenericClient ensures proper user/assistant role alternation
+        graphiti_llm = FixedOpenAIGenericClient(config=llm_config)
+        logger.info(f"✓ Using fixed LLM client: {type(graphiti_llm).__name__}")
 
         # Create embedder (hosted or local)
         if settings.use_hosted_embeddings:
@@ -161,35 +164,9 @@ class GraphitiClient:
             logger.info("Using local sentence-transformers embeddings")
             embedder = CustomEmbedder()
 
-        # Create reranker based on settings
-        # IMPORTANT: Never pass None to Graphiti, as it will try to create
-        # OpenAIRerankerClient which requires OPENAI_API_KEY
+        logger.info("🚀 Using NoOp reranker (maximum speed, no reranking)")
+        reranker = NoOpRerankerClient()
 
-        # Legacy support: USE_RERANKER=true -> use BGE
-        if settings.use_reranker and settings.reranker_type == "noop":
-            reranker_type = "bge"
-        else:
-            reranker_type = settings.reranker_type.lower()
-
-        if reranker_type == "bge":
-            # BGE cross-encoder: accurate but VERY slow on CPU
-            logger.info("🐢 Using BGE cross-encoder reranker (slow but accurate)")
-            reranker = BGERerankerClient()
-        elif reranker_type == "hosted":
-            # Hosted reranker: uses Lapathon API (medium speed)
-            logger.info("🌐 Using hosted API reranker (medium speed, API-based)")
-            reranker = HostedRerankerClient(
-                use_logprobs=settings.reranker_use_logprobs,
-                max_concurrent=settings.reranker_max_concurrent
-            )
-        else:
-            # NoOp reranker: returns passages in original order (fast)
-            logger.info("🚀 Using NoOp reranker (maximum speed, no reranking)")
-            reranker = NoOpRerankerClient()
-
-        # Initialize Graphiti with parallelization config
-        # Увага: database параметр не підтримується конструктором
-        # Використовуємо лише uri, user, password
         self.graphiti = Graphiti(
             uri=self.neo4j_uri,
             user=self.neo4j_user,
@@ -197,7 +174,6 @@ class GraphitiClient:
             llm_client=graphiti_llm,
             embedder=embedder,
             cross_encoder=reranker,
-            # Паралелізація LLM та embedding calls
             max_coroutines=settings.graphiti_max_concurrent_llm,
         )
 
@@ -213,8 +189,9 @@ class GraphitiClient:
         episode_body: str,
         episode_name: str,
         source_description: str,
-        reference_time: Optional[datetime] = None
-    ) -> None:
+        reference_time: Optional[datetime] = None,
+        custom_extraction_instructions: Optional[str] = None
+    ):
         """
         Add an episode (conversation turn) to the graph memory.
 
@@ -223,18 +200,27 @@ class GraphitiClient:
             episode_name: Name/ID for this episode
             source_description: Description of the source (e.g., user_id)
             reference_time: Optional reference time (datetime object)
+            custom_extraction_instructions: Optional instructions for LLM extraction
+
+        Returns:
+            AddEpisodeResults with episode, nodes, edges info
         """
         if not self._initialized or self.graphiti is None:
             raise RuntimeError("Graphiti not initialized. Call initialize() first.")
 
+        # Use default instructions if not provided
+        instructions = custom_extraction_instructions or settings.graphiti_custom_instructions
+
         try:
-            await self.graphiti.add_episode(
+            result = await self.graphiti.add_episode(
                 name=episode_name,
                 episode_body=episode_body,
                 source_description=source_description,
-                reference_time=reference_time
+                reference_time=reference_time,
+                custom_extraction_instructions=instructions
             )
             logger.info(f"Episode added: {episode_name}")
+            return result
         except Exception as e:
             logger.error(f"Failed to add episode: {e}", exc_info=True)
             raise

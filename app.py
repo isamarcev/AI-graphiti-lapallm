@@ -14,6 +14,8 @@ from config.phoenix_config import setup_phoenix_instrumentation
 from clients.graphiti_client import get_graphiti_client
 import logging
 
+from utils import setup_langsmith
+
 # Configure logging on startup
 configure_logging(level="INFO")
 logger = logging.getLogger(__name__)
@@ -33,6 +35,7 @@ async def lifespan(app: FastAPI):
             logger.info("✓ Phoenix instrumentation enabled")
         else:
             logger.info("ℹ Phoenix instrumentation disabled or unavailable")
+        setup_langsmith()
     except Exception as e:
         logger.warning(f"Phoenix setup warning: {e}")
     

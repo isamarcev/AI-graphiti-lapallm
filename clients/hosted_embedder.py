@@ -37,8 +37,8 @@ class HostedQwenEmbedder(EmbedderClient):
             model_name: Model name (default from settings.embedding_model_name)
         """
         # Hosted API doesn't use /v1 suffix, so strip it if present
-        self.base_url = base_url or settings.vllm_base_url.rstrip('/v1')
-        self.api_key = api_key or settings.vllm_api_key
+        self.base_url = base_url or settings.lapa_url.rstrip('/v1')
+        self.api_key = api_key or settings.api_key
         self.model_name = model_name or settings.embedding_model_name
 
         logger.info(f"Initializing hosted embedder: {self.model_name}")
