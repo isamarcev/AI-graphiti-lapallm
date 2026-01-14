@@ -189,8 +189,9 @@ class GraphitiClient:
         episode_body: str,
         episode_name: str,
         source_description: str,
-        reference_time: Optional[datetime] = None
-    ) -> None:
+        reference_time: Optional[datetime] = None,
+        custom_extraction_instructions: Optional[str] = None
+    ):
         """
         Add an episode (conversation turn) to the graph memory.
 
@@ -199,18 +200,27 @@ class GraphitiClient:
             episode_name: Name/ID for this episode
             source_description: Description of the source (e.g., user_id)
             reference_time: Optional reference time (datetime object)
+            custom_extraction_instructions: Optional instructions for LLM extraction
+
+        Returns:
+            AddEpisodeResults with episode, nodes, edges info
         """
         if not self._initialized or self.graphiti is None:
             raise RuntimeError("Graphiti not initialized. Call initialize() first.")
 
+        # Use default instructions if not provided
+        instructions = custom_extraction_instructions or settings.graphiti_custom_instructions
+
         try:
-            await self.graphiti.add_episode(
+            result = await self.graphiti.add_episode(
                 name=episode_name,
                 episode_body=episode_body,
                 source_description=source_description,
-                reference_time=reference_time
+                reference_time=reference_time,
+                custom_extraction_instructions=instructions
             )
             logger.info(f"Episode added: {episode_name}")
+            return result
         except Exception as e:
             logger.error(f"Failed to add episode: {e}", exc_info=True)
             raise

@@ -84,6 +84,17 @@ class Settings(BaseSettings):
         description="Max concurrent embedding calls in Graphiti"
     )
 
+    # Custom extraction instructions for Graphiti (helps with JSON generation)
+    graphiti_custom_instructions: str = Field(
+        default="""CRITICAL: You MUST return valid JSON.
+- Always close all strings with "
+- Always close all objects with }
+- Always close all arrays with ]
+- Double-check your JSON before responding.
+- Keep responses concise.""",
+        description="Custom instructions added to Graphiti extraction prompts for better JSON compliance"
+    )
+
     # Embeddings Configuration
     embedding_model_name: str = Field(
         default="sentence-transformers/paraphrase-multilingual-mpnet-base-v2",
