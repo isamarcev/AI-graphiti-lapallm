@@ -58,9 +58,9 @@ def print_banner():
   {Colors.GRAY}TEACH: "Столиця України - Київ"
   {Colors.GRAY}SOLVE: "Яка столиця України?"{Colors.RESET}
 
-{Colors.MAGENTA}Модель:{Colors.RESET} {settings.vllm_model_name}
+{Colors.MAGENTA}Модель:{Colors.RESET} {settings.model_name}
 {Colors.MAGENTA}Embeddings:{Colors.RESET} {'Hosted Qwen' if settings.use_hosted_embeddings else settings.embedding_model_name}
-{Colors.MAGENTA}Reranking:{Colors.RESET} {'Enabled 🐢' if settings.use_reranker else 'Disabled 🚀'}
+{Colors.MAGENTA}Reranking:{Colors.RESET} 'Disabled 🚀'
 {Colors.CYAN}{'=' * 70}{Colors.RESET}
 """
     print(banner)

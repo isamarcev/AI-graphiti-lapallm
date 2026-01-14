@@ -110,76 +110,7 @@ class Neo4jMessageStore:
         except Exception as e:
             logger.error(f"Error retrieving message UID for episode {episode_name}: {e}")
             return None
-    
-    async def get_message_by_uid(self, uid: str) -> Optional[dict]:
-        """
-        Отримує повну інформацію про message.
-        
-        Args:
-            uid: Message UID
-        
-        Returns:
-            Dictionary with message data or None if not found
-        """
-        query = """
-        MATCH (m:Message {uid: $uid})
-        RETURN m.uid as uid, m.text as text, m.timestamp as timestamp, m.user_id as user_id
-        """
-        
-        try:
-            async with self.driver.session(database=settings.neo4j_database) as session:
-                result = await session.run(query, uid=uid)
-                record = await result.single()
-                
-                if record:
-                    return {
-                        "uid": record["uid"],
-                        "text": record["text"],
-                        "timestamp": record["timestamp"],
-                        "user_id": record["user_id"]
-                    }
-                else:
-                    logger.debug(f"Message {uid} not found")
-                    return None
-        except Exception as e:
-            logger.error(f"Error retrieving message {uid}: {e}")
-            return None
-    
-    async def get_user_messages(self, user_id: str, limit: int = 10) -> list[dict]:
-        """
-        Отримує останні messages користувача.
-        
-        Args:
-            user_id: User identifier
-            limit: Maximum number of messages to retrieve
-        
-        Returns:
-            List of message dictionaries
-        """
-        query = """
-        MATCH (m:Message {user_id: $user_id})
-        RETURN m.uid as uid, m.text as text, m.timestamp as timestamp
-        ORDER BY m.timestamp DESC
-        LIMIT $limit
-        """
-        
-        try:
-            async with self.driver.session(database=settings.neo4j_database) as session:
-                result = await session.run(query, user_id=user_id, limit=limit)
-                messages = []
-                
-                async for record in result:
-                    messages.append({
-                        "uid": record["uid"],
-                        "text": record["text"],
-                        "timestamp": record["timestamp"]
-                    })
-                
-                logger.info(f"Retrieved {len(messages)} messages for user {user_id}")
-                return messages
-        except Exception as e:
-            logger.error(f"Error retrieving messages for user {user_id}: {e}")
-            return []
+
     
     async def close(self):
         """Close Neo4j driver connection"""

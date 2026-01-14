@@ -7,22 +7,13 @@ from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage, SystemMessage, AIMessage
 from typing import Optional, Type, TypeVar, Any, Dict, List
 from pydantic import BaseModel
-import json
 import logging
 
 from config.settings import settings
 
 # Import LangSmith for tracing
-try:
-    from langsmith import traceable
-    from langsmith.run_helpers import get_current_run_tree
-except ImportError:
-    # Fallback if langsmith not installed
-    def traceable(*args, **kwargs):
-        def decorator(func):
-            return func
-        return decorator
-    get_current_run_tree = None
+from langsmith import traceable
+
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +31,6 @@ class LLMClient:
         base_url: Optional[str] = None,
         api_key: Optional[str] = None,
         model_name: Optional[str] = None,
-        use_openai: bool = False
     ):
         """
         Initialize LLM client.
@@ -49,20 +39,10 @@ class LLMClient:
             base_url: Base URL for vLLM server (e.g., http://localhost:8000/v1)
             api_key: API key (use "EMPTY" for vLLM, actual key for OpenAI)
             model_name: Model name to use
-            use_openai: If True, use OpenAI API instead of vLLM
         """
-        self.base_url = base_url or settings.vllm_base_url
-        self.api_key = api_key or settings.vllm_api_key
-        self.model_name = model_name or settings.vllm_model_name
-        self.use_openai = use_openai or settings.use_openai_fallback
-
-        if self.use_openai and settings.openai_api_key:
-            self.api_key = settings.openai_api_key
-            self.base_url = "https://api.openai.com/v1"
-            self.model_name = "gpt-4o-mini"
-            logger.info("Using OpenAI API fallback")
-        else:
-            logger.info(f"Using vLLM at {self.base_url} with model {self.model_name}")
+        self.base_url = base_url or settings.base_url
+        self.api_key = api_key or settings.api_key
+        self.model_name = model_name or settings.model_name
 
         # LangChain ChatOpenAI with proper timeout and retry
         self.llm = ChatOpenAI(
@@ -71,8 +51,8 @@ class LLMClient:
             model=self.model_name,
             timeout=120.0,  # 120s timeout for hosted API
             max_retries=2,
-            temperature=settings.llm_temperature,
-            max_tokens=settings.llm_max_tokens
+            temperature=settings.temperature,
+            max_tokens=settings.max_tokens
         )
 
     @traceable(name="llm_generate")
@@ -97,8 +77,8 @@ class LLMClient:
         Returns:
             Either a string response or a Pydantic model instance
         """
-        temperature = temperature or settings.llm_temperature
-        max_tokens = max_tokens or settings.llm_max_tokens
+        temperature = temperature or settings.temperature
+        max_tokens = max_tokens or settings.max_tokens
 
         # Convert dict messages to LangChain messages
         lc_messages = []

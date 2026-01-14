@@ -19,23 +19,23 @@ class Settings(BaseSettings):
     )
 
     # vLLM / LLM Configuration
-    vllm_base_url: str = Field(
+    base_url: str = Field(
         default="http://localhost:8000/v1",
         description="vLLM server base URL with OpenAI-compatible API"
     )
-    vllm_api_key: str = Field(
+    api_key: str = Field(
         default="EMPTY",
         description="API key for vLLM (usually not required for local servers)"
     )
-    vllm_model_name: str = Field(
+    model_name: str = Field(
         default="lapa",
         description="Model name/path for Lapa LLM"
     )
-    llm_temperature: float = Field(
+    temperature: float = Field(
         default=0.7,
         description="Temperature for LLM generation"
     )
-    llm_max_tokens: int = Field(
+    max_tokens: int = Field(
         default=2048,
         description="Maximum tokens for LLM responses"
     )
@@ -59,6 +59,10 @@ class Settings(BaseSettings):
     )
 
     # Graphiti Configuration
+    graphiti_temperature: float = Field(
+        default=0.0,
+        description="Temperature for Graphiti LLM (lower for more stable JSON generation)"
+    )
     graphiti_max_episode_length: int = Field(
         default=10000,
         description="Maximum episode length for Graphiti"
@@ -93,39 +97,6 @@ class Settings(BaseSettings):
         default=False,
         description="Use hosted Qwen embeddings instead of local sentence-transformers"
     )
-
-    # Reranking Configuration
-    use_reranker: bool = Field(
-        default=False,
-        description="Enable BGE cross-encoder reranking (significantly slower on CPU, improves relevance)"
-    )
-    reranker_type: str = Field(
-        default="noop",
-        description="Reranker type: 'noop' (fast, no reranking), 'bge' (slow, local), 'hosted' (medium, API-based)"
-    )
-    reranker_use_logprobs: bool = Field(
-        default=True,
-        description="Use logprobs for hosted reranker scoring (more accurate but requires API support)"
-    )
-    reranker_max_concurrent: int = Field(
-        default=10,
-        description="Maximum concurrent API calls for hosted reranker (10-20 recommended for best performance)"
-    )
-
-    # Agent Configuration
-    agent_system_prompt: str = Field(
-        default="""Ти - корисний AI асистент, який розмовляє українською мовою.
-Ти маєш доступ до своєї довготривалої пам'яті, яка зберігає факти про користувача
-та попередні розмови. Використовуй цю інформацію для надання персоналізованих відповідей.
-
-Завжди будь ввічливим, точним та корисним.""",
-        description="System prompt for the agent"
-    )
-    max_conversation_history: int = Field(
-        default=10,
-        description="Number of previous messages to include in context"
-    )
-
     # LangSmith Tracing (optional)
     langchain_tracing_v2: bool = Field(
         default=False,
@@ -143,42 +114,10 @@ class Settings(BaseSettings):
         description="LangSmith project name"
     )
 
-    # Optional: Fallback OpenAI API (for testing without vLLM)
-    openai_api_key: Optional[str] = Field(
-        default=None,
-        description="OpenAI API key (fallback option)"
-    )
-    use_openai_fallback: bool = Field(
-        default=False,
-        description="Use OpenAI API instead of vLLM"
-    )
-
     # ReAct Configuration
     max_react_iterations: int = Field(
         default=3,
         description="Maximum iterations for ReAct loop"
-    )
-
-    # Conflict detection
-    conflict_detection_threshold: float = Field(
-        default=0.7,
-        description="Minimum confidence to detect conflict"
-    )
-
-    # Knowledge quality
-    min_fact_confidence: float = Field(
-        default=0.5,
-        description="Minimum confidence for extracted facts"
-    )
-
-    # Debug settings
-    debug_mode: bool = Field(
-        default=False,
-        description="Enable debug logging"
-    )
-    log_level: str = Field(
-        default="INFO",
-        description="Logging level (DEBUG, INFO, WARNING, ERROR)"
     )
 
     # Phoenix Observability Configuration
@@ -202,11 +141,4 @@ settings = Settings()
 
 def get_settings() -> Settings:
     """Get the global settings instance."""
-    return settings
-
-
-def reload_settings() -> Settings:
-    """Reload settings from environment/file."""
-    global settings
-    settings = Settings()
     return settings
