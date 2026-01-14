@@ -47,3 +47,6 @@ pandas>=2.0.0
 
 # Optional: for Neo4j visualization
 py2neo>=2021.2.3
+
+#DSPython
+dspy-ai>=2.4.0
