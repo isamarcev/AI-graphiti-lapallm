@@ -30,8 +30,9 @@ async def store_knowledge_node(state: AgentState) -> Dict[str, Any]:
     # Save to Qdrant
     qdrant = await QdrantClient().initialize()
     try:
+        # Use a new point id per insert to avoid overwriting if the caller reuses message_uid
         await qdrant.insert_record(
-            record_id=message_uid,
+            record_id=None,
             vector=vector,
             fact=message_text,
             message_id=message_uid,

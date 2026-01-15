@@ -30,7 +30,6 @@ async def classify_intent_node(state: AgentState) -> Dict[str, Any]:
         State update with intent
     """
     logger.info("=== Classify Intent Node ===")
-    logger.info(f"Message: {state['message_text'][:100]}...")
 
     llm = get_llm_client()
 
@@ -75,12 +74,8 @@ async def classify_intent_node(state: AgentState) -> Dict[str, Any]:
             temperature=0.1
         )
 
-        logger.info(f"Intent: {result.intent} (confidence: {result.confidence:.2f})")
-        logger.info(f"Reasoning: {result.reasoning}")
-
         return {
-            "intent": result.intent,
-            "confidence": result.confidence
+            "intent": result.intent
         }
 
     except Exception as e:

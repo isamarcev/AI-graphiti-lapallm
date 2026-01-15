@@ -24,8 +24,9 @@ def _extract_similar_facts(results: List[Dict[str, Any]]) -> List[Dict[str, str]
         payload = item.get("payload") or {}
         fact = payload.get("fact")
         message_id = payload.get("messageid") or payload.get("message_id")
-        if fact and message_id:
-            similar_facts.append({"fact": fact, "message_id": message_id})
+        record_id = payload.get("record_id")
+        if fact and record_id:
+            similar_facts.append({"fact": fact, "message_id": message_id, "record_id": record_id})
     return similar_facts
 
 
@@ -46,9 +47,7 @@ async def check_conflicts_node(state: AgentState) -> Dict[str, Any]:
         top_k=3,
         only_relevant=True,
     )
-    logger.info(f"%%%%%%%%%")
-    logger.info(f"Conflict LLM result: {results}")
-    logger.info(f"%%%%%%%%%")
+
     await qdrant.close()
 
     similar_facts = _extract_similar_facts(results)
@@ -58,7 +57,7 @@ async def check_conflicts_node(state: AgentState) -> Dict[str, Any]:
         return {"conflicts": []}
 
     message_fact_map: Dict[str, str] = {
-        item["message_id"]: item["fact"] for item in similar_facts
+        item["record_id"]: item["fact"] for item in similar_facts
     }
 
     # Build prompt for conflict checking
@@ -101,7 +100,7 @@ async def check_conflicts_node(state: AgentState) -> Dict[str, Any]:
         logger.error(f"Conflict LLM check failed: {e}")
         conflicts = []
 
-    # Normalize conflicts to list of (message_id, fact) tuples for AgentState
+    # Normalize conflicts to list of (record_id, fact) tuples for AgentState
     normalized_conflicts: List[Tuple[str, str]] = []
     for cid in conflicts:
         if not isinstance(cid, str):
@@ -113,7 +112,7 @@ async def check_conflicts_node(state: AgentState) -> Dict[str, Any]:
         if fact_text:
             normalized_conflicts.append((cid_clean, fact_text))
         else:
-            logger.debug(
+            logger.warning(
                 "Conflict id from LLM not found in similar facts payload; skipping",
                 extra={"message_id": cid_clean},
             )

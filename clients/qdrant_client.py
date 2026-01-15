@@ -141,10 +141,57 @@ class QdrantClient:
             ]
         )
 
+        # Scroll to find matching point IDs
+        scroll_result = await self._client.scroll(
+            collection_name=self.collection,
+            scroll_filter=filter_condition,
+            limit=100,
+            with_payload=False,
+            with_vectors=False,
+        )
+
+        point_ids = [point.id for point in scroll_result[0]] if scroll_result else []
+        if not point_ids:
+            logger.warning("No Qdrant points found for messageid=%s", message_id)
+            return
+
         await self._client.set_payload(
             collection_name=self.collection,
             payload={"is_relevant": is_relevant},
-            filter=filter_condition,
+            points=point_ids,
+        )
+
+    async def set_relevance_by_record_id(self, record_id: str, is_relevant: bool) -> None:
+        """Update is_relevant for points matching the stored payload record_id."""
+        if self._client is None:
+            raise RuntimeError("QdrantClient not initialized. Call initialize() first.")
+
+        filter_condition = qmodels.Filter(
+            must=[
+                qmodels.FieldCondition(
+                    key="record_id",
+                    match=qmodels.MatchValue(value=record_id),
+                )
+            ]
+        )
+
+        scroll_result = await self._client.scroll(
+            collection_name=self.collection,
+            scroll_filter=filter_condition,
+            limit=100,
+            with_payload=False,
+            with_vectors=False,
+        )
+
+        point_ids = [point.id for point in scroll_result[0]] if scroll_result else []
+        if not point_ids:
+            logger.warning("No Qdrant points found for record_id=%s", record_id)
+            return
+
+        await self._client.set_payload(
+            collection_name=self.collection,
+            payload={"is_relevant": is_relevant},
+            points=point_ids,
         )
 
     async def search_similar(
