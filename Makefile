@@ -4,7 +4,12 @@ run:
 	 uv run uvicorn app:app --reload --port 8080
 up-services:
 	docker compose -f docker-compose.services.yml up
+
+graph:
+	uv run python scripts/graph_generate_view.py
 .PHONY: help build up down restart logs clean test env
+
+
 
 # Кольори для виводу
 BLUE := \033[0;34m
