@@ -25,36 +25,22 @@ services:
       start_period: 40s
 
   # ============================================
-  # Neo4j - Graph Database
+  # Qdrant - Vector Database
   # ============================================
-  neo4j:
-    image: neo4j:5.26
-    container_name: graphiti-lapa-neo4j
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: graphiti-lapa-qdrant
     ports:
-      - "7474:7474"  # HTTP Web UI
-      - "7687:7687"  # Bolt protocol
-    environment:
-      - NEO4J_AUTH=neo4j/password123
-      - NEO4J_PLUGINS=["apoc"]
-      - NEO4J_dbms_security_procedures_unrestricted=apoc.*
-      - NEO4J_dbms_memory_heap_initial__size=512m
-      - NEO4J_dbms_memory_heap_max__size=2G
+      - "6333:6333"  # REST API
+      - "6334:6334"  # gRPC
     volumes:
-      - neo4j_data:/data
-      - neo4j_logs:/logs
-    healthcheck:
-      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider localhost:7474 || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      - qdrant_data:/qdrant/storage
     networks:
       - graphiti-network
     restart: unless-stopped
 
 volumes:
-  neo4j_data:
-    driver: local
-  neo4j_logs:
+  qdrant_data:
     driver: local
   phoenix_data:
     driver: local
