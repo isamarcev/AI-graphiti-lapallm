@@ -11,7 +11,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from routers.text import router as text_router
 from config.logging_config import configure_logging
 from config.phoenix_config import setup_phoenix_instrumentation
-from clients.graphiti_client import get_graphiti_client
 import logging
 
 # Configure logging on startup
@@ -34,17 +33,7 @@ async def lifespan(app: FastAPI):
         else:
             logger.info("ℹ Phoenix instrumentation disabled or unavailable")
     except Exception as e:
-        logger.warning(f"Phoenix setup warning: {e}")
-    
-    # Startup: build indices once
-    logger.info("Initializing Graphiti indices...")
-    try:
-        graphiti = await get_graphiti_client()
-        await graphiti.graphiti.build_indices_and_constraints()
-        logger.info("✓ Graphiti indices built successfully")
-    except Exception as e:
-        logger.warning(f"Index building warning (may already exist): {e}")
-    
+        logger.warning(f"Phoenix setup warning: {e}")    
     yield
     
     # Shutdown: cleanup

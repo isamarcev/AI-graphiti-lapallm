@@ -1,7 +1,4 @@
-"""
-Node 1: Intent Classification
-Determines if message is TEACH (learning) or SOLVE (task).
-"""
+
 
 import logging
 from typing import Dict, Any
@@ -16,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 class IntentClassification(BaseModel):
     """Structured output for intent classification."""
-    intent: str  # "teach" or "solve"
+    intent: str  # "learn" or "solve"
     confidence: float
     reasoning: str
 
@@ -25,10 +22,6 @@ class IntentClassification(BaseModel):
 async def classify_intent_node(state: AgentState) -> Dict[str, Any]:
     """
     Node 1: Classify intent of user message.
-
-    Determines whether the user is:
-    - TEACH: Providing information/facts to learn
-    - SOLVE: Asking to solve a task/question
 
     Args:
         state: Current agent state
@@ -47,7 +40,7 @@ async def classify_intent_node(state: AgentState) -> Dict[str, Any]:
 
 Визнач чи користувач:
 
-1. **TEACH (навчання)** - дає інформацію, факти, описує, пояснює, навчає
+1. **LEARN (навчання)** - дає інформацію, факти, описує, пояснює, навчає
    Приклади (універсальні домени):
    - Особиста інформація: "Моє ім'я Олег", "У мене алергія на арахіс"
    - Географія/історія: "Столиця України - Київ", "Війна закінчилася в 1945"
@@ -67,10 +60,10 @@ async def classify_intent_node(state: AgentState) -> Dict[str, Any]:
 
 **КРИТИЧНО:**
 - НЕ припускай що це про конкретну предметну область (код, документи, вірші)
-- Класифікуй тільки ЗА ФОРМОЮ: дає інформацію (TEACH) чи просить дію (SOLVE)
+- Класифікуй тільки ЗА ФОРМОЮ: дає інформацію (LEARN) чи просить дію (SOLVE)
 - Будь універсальним
 
-Відповідай JSON: {"intent": "teach" або "solve", "confidence": 0.0-1.0, "reasoning": "пояснення"}"""
+Відповідай JSON: {"intent": "learn" або "solve", "confidence": 0.0-1.0, "reasoning": "пояснення"}"""
 
     try:
         result = await llm.generate_async(

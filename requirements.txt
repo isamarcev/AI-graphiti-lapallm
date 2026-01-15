@@ -4,7 +4,6 @@ uvicorn[standard]>=0.24.0
 
 # LLM & AI Libraries
 openai>=1.10.0
-graphiti-core>=0.25.3
 
 # LangChain & LangGraph
 langchain>=0.1.0
@@ -24,12 +23,6 @@ opentelemetry-sdk>=1.20.0
 opentelemetry-exporter-otlp>=1.20.0
 opentelemetry-instrumentation>=0.41b0
 
-# Graph Database
-neo4j>=5.14.0
-
-# Embeddings
-sentence-transformers>=2.2.0
-
 # Data validation
 pydantic>=2.5.0
 pydantic-settings>=2.1.0
@@ -37,12 +30,10 @@ pydantic-settings>=2.1.0
 # Utilities
 python-dotenv>=1.0.0
 httpx>=0.25.0
+qdrant-client>=1.9.0
 
 # Jupyter for demo (optional, comment out for production)
 jupyter>=1.0.0
 ipykernel>=6.25.0
 matplotlib>=3.7.0
 pandas>=2.0.0
-
-# Optional: for Neo4j visualization
-py2neo>=2021.2.3

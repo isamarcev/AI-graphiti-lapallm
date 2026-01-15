@@ -9,7 +9,7 @@ from typing import Dict, Any, List
 from agent.state import AgentState
 from agent.helpers import extract_search_query, format_search_results
 from clients.llm_client import get_llm_client
-from clients.graphiti_client import get_graphiti_client
+from clients.qdrant_client import QdrantClient
 from config.settings import settings
 from langsmith import traceable
 
@@ -42,7 +42,9 @@ async def react_loop_node(state: AgentState) -> Dict[str, Any]:
     logger.info(f"Max iterations: {max_iterations}")
 
     llm = get_llm_client()
-    graphiti = await get_graphiti_client()
+    # Lazy-init Qdrant client
+    qdrant = QdrantClient()
+    await qdrant.initialize()
 
     # Build initial context
     retrieved_context = state.get("retrieved_context", [])
@@ -122,28 +124,47 @@ async def react_loop_node(state: AgentState) -> Dict[str, Any]:
         elif any(keyword in thought_lower for keyword in ["шукати", "знайти", "потрібно", "search", "find", "need"]):
             action = "search"
 
-            # Extract search query from thought
+            # Extract search query from thought (for logging only)
             search_query = extract_search_query(thought)
             logger.info(f"Action: {action} - Query: {search_query}")
 
-            # Search for additional context
-            try:
-                search_results = await graphiti.search(
-                    query=search_query,
-                    limit=3
-                )
+            # Use existing embedding to search Qdrant
+            query_vector = state.get("message_embedding")
+            if not query_vector:
+                observation = "Немає embedding для пошуку"
+                logger.warning(observation)
+            else:
+                try:
+                    search_results = await qdrant.search_similar(
+                        query_vector=query_vector,
+                        top_k=3,
+                        only_relevant=True,
+                    )
 
-                observation = format_search_results(search_results)
-                logger.info(f"Observation: Found {len(search_results)} results")
+                    # Map Qdrant results to simple structure
+                    formatted_results = []
+                    for hit in search_results:
+                        payload = hit.get("payload") or {}
+                        formatted_results.append({
+                            "content": payload.get("fact") or "",
+                            "score": hit.get("score", 0.0),
+                            "source_msg_uid": payload.get("messageid") or payload.get("record_id") or "unknown",
+                            "timestamp": payload.get("timestamp"),
+                        })
 
-                # Add new results to context
-                for result in search_results:
-                    content = result.get('content', '') or result.get('fact', '')
-                    context_text += f"\n{content}"
+                    # Append to context
+                    retrieved_context.extend(formatted_results)
+                    context_text = "\n".join([
+                        f"[{i}] ({ctx['source_msg_uid']}): {ctx['content']}"
+                        for i, ctx in enumerate(retrieved_context)
+                    ])
 
-            except Exception as e:
-                logger.error(f"Error during search: {e}")
-                observation = f"Помилка пошуку: {e}"
+                    observation = format_search_results(formatted_results)
+                    logger.info(f"Observation: Found {len(formatted_results)} Qdrant results")
+
+                except Exception as e:
+                    logger.error(f"Error during search: {e}")
+                    observation = f"Помилка пошуку: {e}"
 
             steps.append({
                 "thought": thought,

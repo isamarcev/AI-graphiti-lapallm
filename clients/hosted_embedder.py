@@ -8,13 +8,12 @@ import asyncio
 import logging
 from openai import AsyncOpenAI
 
-from graphiti_core.embedder import EmbedderClient
 from config.settings import settings
 
 logger = logging.getLogger(__name__)
 
 
-class HostedQwenEmbedder(EmbedderClient):
+class HostedQwenEmbedder:
     """
     Embedder using hosted text-embedding-qwen model.
 
@@ -152,7 +151,7 @@ class HostedQwenEmbedder(EmbedderClient):
 
 
 # Factory function for easy switching
-def get_embedder(use_hosted: bool = False) -> EmbedderClient:
+def get_embedder(use_hosted: bool = False) -> HostedQwenEmbedder:
     """
     Get embedder instance based on configuration.
 
@@ -160,12 +159,7 @@ def get_embedder(use_hosted: bool = False) -> EmbedderClient:
         use_hosted: If True, use hosted API; if False, use local sentence-transformers
 
     Returns:
-        EmbedderClient instance
+        HostedQwenEmbedder instance
     """
-    if use_hosted:
-        logger.info("Using hosted Qwen embeddings")
-        return HostedQwenEmbedder()
-    else:
-        logger.info("Using local sentence-transformers")
-        from clients.graphiti_client import CustomEmbedder
-        return CustomEmbedder()
+    logger.info("Using hosted Qwen embeddings")
+    return HostedQwenEmbedder()
