@@ -3,7 +3,7 @@ Node 1: Intent Classification
 Determines if message is LEARN (learning) or SOLVE (task).
 Uses DSPy framework for declarative LLM programming.
 """
-
+import asyncio
 import logging
 from typing import Dict, Any
 import dspy
@@ -16,13 +16,25 @@ logger = logging.getLogger(__name__)
 
 
 class ClassifyIntentSignature(dspy.Signature):
-    """Класифікуй намір повідомлення: чи користувач навчає систему (LEARN), чи просить виконати завдання (SOLVE).
+    """Визнач намір користувача: LEARN (навчання/запам'ятовування) або SOLVE (вирішення завдання).
 
-    Аналізуй тільки ФОРМУ повідомлення.
+    КРИТЕРІЇ:
+    1. SOLVE (Вирішення):
+       - Користувач ставить запитання (пряме чи непряме).
+       - Користувач дає інструкцію щось зробити (написати, перекласти, пояснити, скоротити).
+       - Навіть якщо повідомлення містить багато контексту/тексту, але є прохання обробити його — це SOLVE.
+       - Очікувана реакція системи: Відповідь, результат роботи або дія.
+
+    2. LEARN (Навчання):
+       - Користувач надає факти, правила, документацію або спогади ВИКЛЮЧНО для збереження в базу знань.
+       - У повідомленні ВІДСУТНЄ прохання це обробити зараз.
+       - Очікувана реакція системи: Підтвердження ("Збережено", "Зрозуміло").
+
+    ВАЖЛИВО: Пріоритет у SOLVE. Якщо є хоч найменший натяк на запитання чи прохання дії — обирай SOLVE.
     """
     message: str = dspy.InputField(desc="Вхідне повідомлення від користувача")
-    intent: str = dspy.OutputField(desc="Тільки 'learn' або 'solve'")
-    reasoning: str = dspy.OutputField(desc="Коротке пояснення вибору")
+    intent: str = dspy.OutputField(desc="Категорія: 'solve' (якщо потрібна відповідь/дія) або 'learn' (тільки якщо це чисте додавання знань)")
+    reasoning: str = dspy.OutputField(desc="Чому обрано цей інтент? (наприклад: 'Користувач ставить питання' або 'Користувач дає факт без запиту')")
 
 
 class ClassifyIntent(dspy.Module):
@@ -96,18 +108,9 @@ async def classify_intent_node(state: AgentState) -> Dict[str, Any]:
 
         # Виконати класифікацію через DSPy
         # DSPy автоматично формує промпт з Signature (всі інструкції в desc полях)
-        result = classifier(message_text)
-
+        result = await asyncio.to_thread(classifier, message=message_text)
         # Обробити результат від DSPy
         intent = result.intent.lower().strip()
-        if intent not in ["learn", "solve"]:
-            # Fallback: спробувати витягти з reasoning
-            if "learn" in result.reasoning.lower():
-                intent = "learn"
-            elif "solve" in result.reasoning.lower():
-                intent = "solve"
-            else:
-                intent = "solve"  # Default на SOLVE при неоднозначності
 
         # Парсинг confidence
         try:

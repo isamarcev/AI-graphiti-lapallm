@@ -63,6 +63,18 @@ class HostedQwenEmbedder:
             # Fallback: replace problematic characters
             return text.replace('\udcd1', '').replace('\udcd0', '')
 
+    async def embed(self, text: str) -> List[float]:
+        """
+        Generate embedding for text (primary interface).
+
+        Args:
+            text: Text to embed
+
+        Returns:
+            Embedding vector
+        """
+        return await self.create(text)
+
     async def create(self, input_data: str | List[str]) -> List[float]:
         """
         Create embedding for a SINGLE text.
