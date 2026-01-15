@@ -1,6 +1,6 @@
 """
 Node 1: Intent Classification
-Determines if message is TEACH (learning) or SOLVE (task).
+Determines if message is LEARN (learning) or SOLVE (task).
 Uses DSPy framework for declarative LLM programming.
 """
 
@@ -16,12 +16,12 @@ logger = logging.getLogger(__name__)
 
 
 class ClassifyIntentSignature(dspy.Signature):
-    """Класифікуй намір повідомлення: чи користувач навчає систему (TEACH), чи просить виконати завдання (SOLVE).
+    """Класифікуй намір повідомлення: чи користувач навчає систему (LEARN), чи просить виконати завдання (SOLVE).
 
     Аналізуй тільки ФОРМУ повідомлення.
     """
     message: str = dspy.InputField(desc="Вхідне повідомлення від користувача")
-    intent: str = dspy.OutputField(desc="Тільки 'teach' або 'solve'")
+    intent: str = dspy.OutputField(desc="Тільки 'learn' або 'solve'")
     reasoning: str = dspy.OutputField(desc="Коротке пояснення вибору")
 
 
@@ -75,7 +75,7 @@ async def classify_intent_node(state: AgentState) -> Dict[str, Any]:
     Node 1: Classify intent of user message using DSPy framework.
 
     Determines whether the user is:
-    - TEACH: Providing information/facts to learn
+    - LEARN: Providing information/facts to learn
     - SOLVE: Asking to solve a task/question
 
     Args:
@@ -100,10 +100,10 @@ async def classify_intent_node(state: AgentState) -> Dict[str, Any]:
 
         # Обробити результат від DSPy
         intent = result.intent.lower().strip()
-        if intent not in ["teach", "solve"]:
+        if intent not in ["learn", "solve"]:
             # Fallback: спробувати витягти з reasoning
-            if "teach" in result.reasoning.lower():
-                intent = "teach"
+            if "learn" in result.reasoning.lower():
+                intent = "learn"
             elif "solve" in result.reasoning.lower():
                 intent = "solve"
             else:
