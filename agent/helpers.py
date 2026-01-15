@@ -9,49 +9,6 @@ from clients.llm_client import get_llm_client
 
 logger = logging.getLogger(__name__)
 
-
-def extract_search_query(thought: str) -> str:
-    """
-    Витягує search query з ReAct thought.
-    
-    Uses heuristics to extract the relevant search terms from the agent's
-    reasoning step.
-    
-    Args:
-        thought: ReAct thought/reasoning text
-    
-    Returns:
-        Extracted search query string
-    
-    Examples:
-        "Потрібно знайти інформацію про Київ" -> "Київ"
-        "Шукати 'столиця України'" -> "столиця України"
-    """
-    # Simple heuristic: extract quoted text first
-    quoted = re.findall(r'["\'](.+?)["\']', thought)
-    if quoted:
-        query = quoted[0]
-        logger.debug(f"Extracted query from quotes: {query}")
-        return query
-    
-    # Fallback: keywords після "про", "шукати", "знайти"
-    keywords = ["про", "шукати", "знайти", "пошук", "інформацію про", "information about"]
-    for keyword in keywords:
-        if keyword in thought.lower():
-            parts = thought.lower().split(keyword)
-            if len(parts) > 1:
-                # Take first 3 words after keyword
-                words = parts[1].strip().split()[:3]
-                query = " ".join(words)
-                logger.debug(f"Extracted query after '{keyword}': {query}")
-                return query
-    
-    # Last resort: return whole thought (truncated)
-    query = thought[:100]
-    logger.debug(f"Using full thought as query (truncated): {query}")
-    return query
-
-
 def format_search_results(results: list) -> str:
     """
     Format Graphiti search results для observation в ReAct loop.
@@ -72,7 +29,7 @@ def format_search_results(results: list) -> str:
         score = result.get('score', 0.0)
         
         # Truncate long content
-        content_preview = content[:200] + "..." if len(content) > 200 else content
+        content_preview = content
         formatted.append(f"{i}. [score: {score:.2f}] {content_preview}")
     
     result_text = "\n".join(formatted)
