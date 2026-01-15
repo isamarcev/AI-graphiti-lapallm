@@ -40,22 +40,22 @@ class Settings(BaseSettings):
         description="Maximum tokens for LLM responses"
     )
 
-    # Neo4j Configuration
-    neo4j_uri: str = Field(
-        default="bolt://localhost:7687",
-        description="Neo4j connection URI"
+    # Qdrant Configuration
+    qdrant_url: str = Field(
+        default="http://qdrant:6333",
+        description="Qdrant REST endpoint (e.g., http://qdrant:6333)"
     )
-    neo4j_user: str = Field(
-        default="neo4j",
-        description="Neo4j username"
+    qdrant_api_key: Optional[str] = Field(
+        default=None,
+        description="Qdrant API key (if auth enabled)"
     )
-    neo4j_password: str = Field(
-        default="password123",
-        description="Neo4j password"
+    qdrant_collection: str = Field(
+        default="facts",
+        description="Qdrant collection name for fact storage"
     )
-    neo4j_database: str = Field(
-        default="neo4j",
-        description="Neo4j database name"
+    qdrant_distance: str = Field(
+        default="cosine",
+        description="Vector distance metric: cosine | dot | euclid"
     )
 
     # Graphiti Configuration
@@ -97,8 +97,8 @@ class Settings(BaseSettings):
 
     # Embeddings Configuration
     embedding_model_name: str = Field(
-        default="sentence-transformers/paraphrase-multilingual-mpnet-base-v2",
-        description="Sentence transformer model for embeddings (supports Ukrainian)"
+        default="text-embedding-qwen",
+        description="Embedding model name"
     )
     embedding_dimension: int = Field(
         default=768,
@@ -106,7 +106,7 @@ class Settings(BaseSettings):
     )
     use_hosted_embeddings: bool = Field(
         default=False,
-        description="Use hosted Qwen embeddings instead of local sentence-transformers"
+        description="Use hosted embeddings"
     )
     # LangSmith Tracing (optional)
     langchain_tracing_v2: bool = Field(

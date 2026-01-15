@@ -6,11 +6,10 @@ Simplified version: Graphiti handles fact extraction internally.
 
 import logging
 from typing import Dict, Any
-from datetime import datetime
 
 from agent.state import AgentState
-from clients.graphiti_client import get_graphiti_client
-from db.neo4j_helpers import get_message_store
+from clients.qdrant_client import QdrantClient
+from clients.hosted_embedder import HostedQwenEmbedder
 from langsmith import traceable
 
 logger = logging.getLogger(__name__)
@@ -18,96 +17,29 @@ logger = logging.getLogger(__name__)
 
 @traceable(name="store_knowledge")
 async def store_knowledge_node(state: AgentState) -> Dict[str, Any]:
-    """
-    Store knowledge in both Graphiti and Neo4j.
+    logger.info("=== Store Knowledge Node ===")
 
-    Simplified workflow (single LLM call):
-    1. Save episode to Graphiti (extracts facts internally)
-    2. Save raw message to Neo4j (for message_uid references)
-    3. Log extracted entities/relations
+    message_uid = state["message_uid"]
+    message_text = state["message_text"]
+    vector = state.get("message_embedding")
+    if not vector:
+        logger.warning("message_embedding missing; generating embedding in store node")
+        embedder = HostedQwenEmbedder()
+        vector = await embedder.create(message_text)
 
-    Args:
-        state: Current agent state with message_text
-
-    Returns:
-        State update with response confirmation and extracted entity count
-    """
-    logger.info("=== Store Knowledge Node (Simplified) ===")
-    logger.info(f"Storing message {state['message_uid']}: {state['message_text'][:80]}...")
-
-    graphiti = await get_graphiti_client()
-    message_store = await get_message_store()
-
+    # Save to Qdrant
+    qdrant = await QdrantClient().initialize()
     try:
-        # 1. Add episode to Graphiti (single LLM call, Graphiti extracts facts)
-        episode_name = f"teach_{state['message_uid']}"
-
-        # Format as proper conversation with user/assistant alternation
-        # CRITICAL: LiteLLM requires proper role alternation
-        user_message = state["message_text"]
-        assistant_message = "Дякую за інформацію. Я її зберіг."
-
-        episode_body = f"""User: {user_message}
-Assistant: {assistant_message}"""
-
-        logger.info(f"Adding episode to Graphiti: {episode_name}")
-        logger.info(f"Episode body:\n{episode_body}")
-
-        result = await graphiti.add_episode(
-            episode_body=episode_body,
-            episode_name=episode_name,
-            source_description=f"user:{state['user_id']}, uid:{state['message_uid']}",
-            reference_time=state["timestamp"]
+        # Use a new point id per insert to avoid overwriting if the caller reuses message_uid
+        await qdrant.insert_record(
+            record_id=None,
+            vector=vector,
+            fact=message_text,
+            message_id=message_uid,
+            is_relevant=True,
         )
+        logger.info("Stored message in Qdrant", extra={"message_id": message_uid})
+    finally:
+        await qdrant.close()
 
-        # Extract episode result info
-        episode = result.episode if hasattr(result, 'episode') else result
-        episode_id = episode.uuid if hasattr(episode, 'uuid') else episode_name
-        logger.info(f"✓ Episode saved with ID: {episode_id}")
-
-        # Log extracted entities and relations (if available)
-        nodes = result.nodes if hasattr(result, 'nodes') else []
-        edges = result.edges if hasattr(result, 'edges') else []
-
-        if nodes:
-            entity_names = [node.name for node in nodes if hasattr(node, 'name')]
-            logger.info(f"📦 Extracted {len(entity_names)} entities: {entity_names}")
-
-        if edges:
-            relations = [
-                f"{edge.source_node_name} -> {edge.name} -> {edge.target_node_name}"
-                for edge in edges
-                if hasattr(edge, 'name') and hasattr(edge, 'source_node_name') and hasattr(edge, 'target_node_name')
-            ]
-            logger.info(f"🔗 Extracted {len(relations)} relations: {relations}")
-
-        # 2. Save message to Neo4j for references
-        logger.info(f"Saving message to Neo4j")
-
-        await message_store.save_message(
-            uid=state["message_uid"],
-            text=state["message_text"],
-            episode_name=episode_name,
-            user_id=state["user_id"],
-            timestamp=state["timestamp"]
-        )
-
-        logger.info(f"✓ Message saved to Neo4j and linked to episode")
-
-        # 3. Prepare response
-        entity_count = len(nodes)
-        response = f"✓ Навчання збережено.\n\nВивчено {entity_count} сутностей з повідомлення {state['message_uid']}."
-
-        return {
-            "response": response,
-            "references": [state["message_uid"]],
-            "confidence": 1.0
-        }
-
-    except Exception as e:
-        logger.error(f"Error storing knowledge: {e}", exc_info=True)
-        return {
-            "response": f"Помилка при збереженні знань: {e}",
-            "references": [],
-            "confidence": 0.0
-        }
+    return {"message_embedding": vector}

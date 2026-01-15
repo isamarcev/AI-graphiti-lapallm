@@ -3,33 +3,26 @@ State definition for knowledge-centered agent.
 Defines the structure of data that flows through the graph.
 """
 
-from typing import TypedDict, Literal, Optional, List
+from typing import TypedDict, Literal, Optional, List, Tuple
 from datetime import datetime
 from models.schemas import RetrievedContext, ReactStep
 
 
 class AgentState(TypedDict):
-    """
-    State для knowledge-centered agent з teach/solve paths.
-
-    Simplified architecture:
-    - TEACH path: user provides knowledge, agent stores directly to Graphiti
-    - SOLVE path: agent retrieves and uses knowledge to solve tasks
-    """
 
     # Input
     message_uid: str
     message_text: str
-    user_id: str
     timestamp: datetime
 
     # Classification
-    intent: Optional[Literal["teach", "solve"]]
-    confidence: float
+    intent: Optional[Literal["learn", "solve"]]
 
     # SOLVE path - TYPED structures
     retrieved_context: List[RetrievedContext]
     react_steps: List[ReactStep]
+    conflicts: List[Tuple[str, str]]  # (message_id, fact)
+    message_embedding: List[float]
 
     # Output
     response: str
@@ -64,9 +57,10 @@ def create_initial_state(
         user_id=user_id,
         timestamp=timestamp,
         intent=None,
-        confidence=0.0,
         retrieved_context=[],
         react_steps=[],
+        conflicts=[],
+        message_embedding=[],
         response="",
         references=[],
         reasoning=None
