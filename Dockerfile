@@ -1,59 +1,64 @@
-# Multi-stage build для оптимізації розміру образу
-FROM python:3.11-slim as builder
+# Stage 1: Builder
+# Используем официальный образ uv для копирования бинарного файла
+FROM python:3.12-slim AS builder
 
-# Встановлення системних залежностей для build
-RUN apt-get update && apt-get install -y \
-    gcc \
-    g++ \
-    git \
-    && rm -rf /var/lib/apt/lists/*
+# Установка uv
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
-# Робоча директорія
-WORKDIR /build
+# Переменные окружения для uv
+# Отключаем создание виртуального окружения внутри контейнера, если хотим ставить в систему,
+# но лучше оставить venv для легкого переноса между стадиями.
+ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy
 
-# Копіювання requirements
-COPY requirements.txt .
+WORKDIR /app
 
-# Встановлення Python залежностей (без dev dependencies)
-RUN pip install --no-cache-dir --user -r requirements.txt
+# Сначала копируем только файлы зависимостей для эффективного кеширования слоев
+RUN --mount=type=cache,target=/root/.cache/uv \
+    --mount=type=bind,source=uv.lock,target=uv.lock \
+    --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
+    uv sync --frozen --no-install-project --no-dev
 
-# Production stage
-FROM python:3.11-slim
+# Копируем исходный код
+COPY . .
 
-# Мітки
+# Финальная синхронизация проекта
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --frozen --no-dev
+
+
+# Stage 2: Runtime
+FROM python:3.12-slim
+
 LABEL maintainer="Tabula Rasa Agent Team"
 LABEL description="Tabula Rasa Agent - Knowledge-centered conversational AI"
 
-# Системні залежності для runtime
+# Системные зависимости
 RUN apt-get update && apt-get install -y \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Створення non-root користувача для безпеки
+# Создание non-root пользователя
 RUN useradd -m -u 1000 appuser
 
-# Робоча директорія
 WORKDIR /app
 
-# Копіювання Python пакетів з builder stage
-COPY --from=builder /root/.local /home/appuser/.local
-
-# Копіювання коду застосунку
+# Копируем виртуальное окружение, созданное uv, из стадии builder
+COPY --from=builder --chown=appuser:appuser /app/.venv /app/.venv
+# Копируем код приложения
 COPY --chown=appuser:appuser . .
 
-# Додавання .local/bin до PATH
-ENV PATH=/home/appuser/.local/bin:$PATH
+# Добавляем виртуальное окружение в PATH, чтобы не писать полные пути
+ENV PATH="/app/.venv/bin:$PATH"
 ENV HF_HOME=/home/appuser/.cache/huggingface
+ENV PYTHONUNBUFFERED=1
 
-# Перемикання на non-root користувача
 USER appuser
 
 # Healthcheck
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
     CMD curl -f http://localhost:3000/health || exit 1
 
-# Expose порт
 EXPOSE 3000
 
-# Запуск через uvicorn
+# Запуск через uvicorn (он уже есть в .venv/bin, который в PATH)
 CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "3000", "--workers", "1"]
