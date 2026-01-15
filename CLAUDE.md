@@ -4,35 +4,19 @@ This project follows Cursor's best practices for AI-assisted development. See th
 
 ## 🚀 Quick Start for AI Agents
 
-**Important**: This project uses Cursor's structured approach. Do NOT read this file for development guidance.
-
-Instead, use:
-
-### 📋 Rules (Always Available Context)
-- **`.cursor/rules/RULE.md`** - Core development rules, patterns, and commands
-
-### ⚡ Commands (Reusable Workflows)
-- **`.cursor/commands/dev-setup.md`** - Development environment setup
-- **`.cursor/commands/test-agent.md`** - Agent functionality testing
-- **`.cursor/commands/debug-system.md`** - System debugging and troubleshooting
-
-### 🎯 Skills (Dynamic Capabilities)
-- **`.cursor/skills/SKILL.md`** - Specialized development and debugging capabilities
-
 ## 📚 Project Overview
 
 **Tabula Rasa Agent** - A knowledge-centered conversational AI that starts with zero domain knowledge and learns exclusively from user interactions.
 
 **Key Technologies:**
 - **Lapa LLM** - Ukrainian language model (Gemma 12B based)
-- **Graphiti** - Temporal knowledge graph for memory
+- **Qdrant** - Knowledge for memory
 - **LangGraph** - Agent orchestration framework
-- **Neo4j** - Graph database backend
 - **FastAPI** - REST API
 
 **Core Features:**
 - ✨ **Tabula Rasa** - Zero initial domain knowledge
-- 🧠 **Graph Memory** - Temporal knowledge storage
+- 🧠 **Vector Memory** - Knowledge storage
 - 🔗 **References** - Source citations in every response
 - 🔄 **Auto-resolve** - Automatic conflict resolution (new > old)
 
@@ -40,8 +24,6 @@ Instead, use:
 
 **For detailed setup instructions, see:**
 - **`README.md`** - Complete project documentation
-- **`.cursor/commands/dev-setup.md`** - Quick development setup
-- **`QUICKSTART.md`** - 3-command quick start guide
 
 **Key Points:**
 - Requires Docker + Docker Compose
@@ -61,11 +43,6 @@ Instead, use:
 - **Auto-resolve**: New information automatically replaces old (new > old)
 
 ## 🔧 Troubleshooting & Commands
-
-**For troubleshooting and debugging, see:**
-- **`.cursor/commands/debug-system.md`** - System diagnostics and common issues
-- **`.cursor/commands/test-agent.md`** - Agent testing procedures
-- **`.cursor/skills/SKILL.md`** - Advanced debugging capabilities
 
 **Quick Commands:**
 - `make health` - Check system status

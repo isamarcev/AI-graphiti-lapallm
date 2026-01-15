@@ -20,7 +20,16 @@ async def store_knowledge_node(state: AgentState) -> Dict[str, Any]:
     logger.info("=== Store Knowledge Node ===")
 
     message_uid = state["message_uid"]
-    message_text = state["message_text"]
+    
+    # Support for decomposed memory_updates from orchestrator
+    memory_updates = state.get("memory_updates", [])
+    if memory_updates:
+        # Store all memory updates
+        message_text = "\n".join(memory_updates)
+        logger.info(f"Storing {len(memory_updates)} memory update(s)")
+    else:
+        message_text = state["message_text"]
+    
     vector = state.get("message_embedding")
     if not vector:
         logger.warning("message_embedding missing; generating embedding in store node")
@@ -42,4 +51,9 @@ async def store_knowledge_node(state: AgentState) -> Dict[str, Any]:
     finally:
         await qdrant.close()
 
-    return {"message_embedding": vector}
+    # Return stored count for learn response generation
+    stored_count = len(memory_updates) if memory_updates else 1
+    return {
+        "message_embedding": vector,
+        "stored_memories_count": stored_count
+    }
