@@ -84,9 +84,6 @@ async def check_conflicts_node(state: AgentState) -> Dict[str, Any]:
         {"role": "system", "content": system_prompt},
         {"role": "user", "content": user_prompt},
     ]
-    logger.info(f"%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%")
-    logger.info(f"Conflict LLM prompt: {message}")
-    logger.info(f"%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%")
     try:
         llm_result = await llm.generate_async(
             messages=message,

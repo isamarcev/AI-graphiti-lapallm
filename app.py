@@ -1,10 +1,3 @@
-"""
-FastAPI application for Graphiti-Lapa agent with memory.
-
-Run with:
-    uvicorn app:app --reload --host 0.0.0.0 --port 8080
-"""
-
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -22,10 +15,6 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """
-    FastAPI lifespan handler - runs once on startup/shutdown.
-    Builds Graphiti indices on startup to avoid repeated builds per request.
-    """
     # Startup: Setup Phoenix observability
     logger.info("Application startup: setting up Phoenix instrumentation...")
     try:
@@ -38,19 +27,11 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"Phoenix setup warning: {e}")    
     yield
-    
-    # Shutdown: cleanup
-    logger.info("Application shutdown: closing Graphiti connection...")
-    try:
-        await graphiti.close()
-        logger.info("✓ Graphiti connection closed")
-    except Exception as e:
-        logger.error(f"Error closing Graphiti: {e}")
 
 # Create FastAPI application
 app = FastAPI(
-    title="Graphiti-Lapa Agent API",
-    description="AI agent з довготривалою пам'яттю на базі Lapa LLM та Graphiti",
+    title="Tabularas Agent API",
+    description="AI agent з довготривалою пам'яттю на базі Lapa LLM",
     version="0.1.0",
     lifespan=lifespan,
 )
@@ -72,7 +53,7 @@ app.include_router(text_router, tags=["text"])
 async def root():
     """Root endpoint with API information."""
     return {
-        "message": "Graphiti-Lapa Agent API",
+        "message": "Tabularas Agent API",
         "version": "0.1.0",
         "docs": "/docs",
         "endpoints": {
