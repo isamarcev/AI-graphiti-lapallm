@@ -2,10 +2,10 @@
 
 import logging
 from typing import Dict, Any
-from pydantic import BaseModel
+import dspy
 
 from agent.state import AgentState
-from clients.llm_client import get_llm_client
+from config.settings import settings
 from langsmith import traceable
 
 logger = logging.getLogger(__name__)
@@ -77,9 +77,9 @@ async def classify_intent_node(state: AgentState) -> Dict[str, Any]:
         return {
             "intent": result.intent
         }
-
+    
     except Exception as e:
-        logger.error(f"Error classifying intent: {e}")
+        logger.error(f"Error classifying intent with DSPy: {e}", exc_info=True)
         # Default to SOLVE on error (safer to treat as task)
         return {
             "intent": "solve",

@@ -12,6 +12,7 @@ langchain-community>=0.0.20
 langgraph>=0.0.40
 langgraph-checkpoint>=0.0.5
 langsmith>=0.1.0
+langchain-openai==1.1.6
 
 # Phoenix Observability & Tracing
 arize-phoenix>=4.0.0
@@ -37,3 +38,6 @@ jupyter>=1.0.0
 ipykernel>=6.25.0
 matplotlib>=3.7.0
 pandas>=2.0.0
+
+#DSPython
+dspy-ai>=2.4.0

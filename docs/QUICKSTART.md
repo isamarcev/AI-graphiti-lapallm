@@ -262,7 +262,7 @@ make clean
 - **Детальний Setup**: [DOCKER_SETUP.md](docs/DOCKER_SETUP.mdUP.md)
 - **Testing Guide**: [TABULA_RASA_TESTING.md](TABULA_RASA_TESTING.md)
 - **Implementation**: [TABULA_RASA_IMPLEMENTATION.md](TABULA_RASA_IMPLEMENTATION.md)
-- **API Usage**: [README.md](README.md)
+- **API Usage**: [README.md](../README.md)
 
 ---
 

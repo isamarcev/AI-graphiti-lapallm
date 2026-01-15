@@ -7,7 +7,6 @@ import logging
 from typing import Dict, Any, List
 
 from agent.state import AgentState
-from agent.helpers import extract_search_query, format_search_results
 from clients.llm_client import get_llm_client
 from clients.qdrant_client import QdrantClient
 from config.settings import settings

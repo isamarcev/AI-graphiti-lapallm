@@ -2,7 +2,8 @@
 
 run:
 	 uv run uvicorn app:app --reload --port 8080
-
+up-services:
+	docker compose -f docker-compose.services.yml up
 .PHONY: help build up down restart logs clean test env
 
 # Кольори для виводу
