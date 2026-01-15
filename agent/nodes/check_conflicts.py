@@ -62,18 +62,21 @@ async def check_conflicts_node(state: AgentState) -> Dict[str, Any]:
 
     # Build prompt for conflict checking
     facts_lines = "\n".join(
-        [f"- {item['message_id']}: {item['fact']}" for item in similar_facts]
+        [
+            f"- record_id={item['record_id']}: {item['fact']}"
+            for item in similar_facts
+        ]
     )
     system_prompt = (
         "Ти інструмент для виявлення суперечностей.\n"
         "Отримуєш новий факт від користувача та список раніше збережених фактів.\n"
-        "Поверни JSON зі списком message_id тих фактів, які суперечать новому факту.\n"
+        "Поверни JSON зі списком record_id тих фактів, які суперечать новому факту.\n"
         "Якщо суперечностей немає — поверни порожній список."
     )
     user_prompt = (
         f"Новий факт: \"{message_text}\"\n\n"
         f"Збережені факти:\n{facts_lines}\n\n"
-        "Відповідай JSON: {\"conflicts\": [\"msg_id1\", \"msg_id2\", ...]}"
+        "Відповідай JSON: {\"conflicts\": [\"record_id1\", \"record_id2\", ...]}"
     )
     llm = get_llm_client()
 
@@ -81,7 +84,9 @@ async def check_conflicts_node(state: AgentState) -> Dict[str, Any]:
         {"role": "system", "content": system_prompt},
         {"role": "user", "content": user_prompt},
     ]
-    
+    logger.info(f"%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%")
+    logger.info(f"Conflict LLM prompt: {message}")
+    logger.info(f"%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%")
     try:
         llm_result = await llm.generate_async(
             messages=message,
@@ -114,7 +119,7 @@ async def check_conflicts_node(state: AgentState) -> Dict[str, Any]:
         else:
             logger.warning(
                 "Conflict id from LLM not found in similar facts payload; skipping",
-                extra={"message_id": cid_clean},
+                extra={"record_id": cid_clean},
             )
 
     return {

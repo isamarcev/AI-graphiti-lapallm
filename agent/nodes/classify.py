@@ -2,21 +2,14 @@
 
 import logging
 from typing import Dict, Any
-import dspy
+
+from pydantic import BaseModel
 
 from agent.state import AgentState
-from config.settings import settings
+from clients.llm_client import get_llm_client
 from langsmith import traceable
 
 logger = logging.getLogger(__name__)
-
-
-class IntentClassification(BaseModel):
-    """Structured output for intent classification."""
-    intent: str  # "learn" or "solve"
-    confidence: float
-    reasoning: str
-
 
 @traceable(name="classify_intent")
 async def classify_intent_node(state: AgentState) -> Dict[str, Any]:
@@ -33,9 +26,8 @@ async def classify_intent_node(state: AgentState) -> Dict[str, Any]:
 
     llm = get_llm_client()
 
-    system_prompt = """🚫 **TABULA RASA РЕЖИМ**:
-Ти починаєш з НУЛЬОВИМИ знаннями про предметну область.
-Класифікуй повідомлення БЕЗ припущень про домен (це може бути ЩО ЗАВГОДНО).
+    system_prompt = """
+Класифікуй повідомлення
 
 Визнач чи користувач:
 
@@ -57,12 +49,7 @@ async def classify_intent_node(state: AgentState) -> Dict[str, Any]:
    - Застосування: "Використовуючи синтаксис що я дав, створи..."
    - Перевірка: "Чи правильно я зробив?", "Перевір цей алгоритм"
 
-**КРИТИЧНО:**
-- НЕ припускай що це про конкретну предметну область (код, документи, вірші)
-- Класифікуй тільки ЗА ФОРМОЮ: дає інформацію (LEARN) чи просить дію (SOLVE)
-- Будь універсальним
-
-Відповідай JSON: {"intent": "learn" або "solve", "confidence": 0.0-1.0, "reasoning": "пояснення"}"""
+Відповідай JSON: {"intent": "learn" або "solve"}"""
 
     try:
         result = await llm.generate_async(
@@ -70,18 +57,18 @@ async def classify_intent_node(state: AgentState) -> Dict[str, Any]:
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": state["message_text"]}
             ],
-            response_format=IntentClassification,
             temperature=0.1
         )
+        logger.info(f"%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%")
+        logger.info(f"Intent classification result: {result}")
+        logger.info(f"%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%")
 
         return {
             "intent": result.intent
         }
     
     except Exception as e:
-        logger.error(f"Error classifying intent with DSPy: {e}", exc_info=True)
-        # Default to SOLVE on error (safer to treat as task)
+        logger.error(f"Error classifying intent{e}", exc_info=True)
         return {
-            "intent": "solve",
-            "confidence": 0.5
+            "intent": "learn"
         }
