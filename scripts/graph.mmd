@@ -6,20 +6,29 @@ config:
 graph TD;
 	__start__([<p>__start__</p>]):::first
 	classify(classify)
+	check_conflicts(check_conflicts)
+	resolve_conflicts(resolve_conflicts)
 	store_knowledge(store_knowledge)
-	generate_teach_response(generate_teach_response)
 	retrieve_context(retrieve_context)
 	react_loop(react_loop)
 	generate_solve_response(generate_solve_response)
+	validate_response(validate_response)
+	generate_learn_response(generate_learn_response)
 	__end__([<p>__end__</p>]):::last
 	__start__ --> classify;
-	classify -. &nbsp;solve&nbsp; .-> retrieve_context;
-	classify -. &nbsp;teach&nbsp; .-> store_knowledge;
+	check_conflicts -.-> resolve_conflicts;
+	check_conflicts -.-> store_knowledge;
+	classify -. &nbsp;process_memory&nbsp; .-> check_conflicts;
+	classify -. &nbsp;learn_only&nbsp; .-> generate_learn_response;
+	classify -. &nbsp;solve_direct&nbsp; .-> retrieve_context;
+	generate_solve_response --> validate_response;
 	react_loop --> generate_solve_response;
+	resolve_conflicts --> store_knowledge;
 	retrieve_context --> react_loop;
-	store_knowledge --> generate_teach_response;
-	generate_solve_response --> __end__;
-	generate_teach_response --> __end__;
+	store_knowledge -. &nbsp;learn&nbsp; .-> generate_learn_response;
+	store_knowledge -. &nbsp;solve&nbsp; .-> retrieve_context;
+	generate_learn_response --> __end__;
+	validate_response --> __end__;
 	classDef default fill:#f2f0ff,line-height:1.2
 	classDef first fill-opacity:0
 	classDef last fill:#bfb6fc

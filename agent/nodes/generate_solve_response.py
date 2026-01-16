@@ -36,7 +36,7 @@ def _build_context_section(retrieved_context: List[RetrievedContext]) -> tuple[s
         score = ctx.score
 
         context_parts.append(
-            f"[{uid}] (релевантність: {score:.2f}):\n{content}"
+            f"[{uid}] (релевантність: {score:.2f}):\n. Content {content}"
         )
         uid_map[uid] = ctx
 
@@ -84,6 +84,10 @@ def _build_prompt_with_context(message_text: str, context_text: str, reasoning_s
 3. Якщо в джерелах недостатньо інформації - встанови `has_sufficient_info: false`
 4. НЕ додавай інформацію, якої немає в джерелах
 5. Якщо джерела суперечать - вкажи це у відповіді
+6. Мати structured output з валідним закінченням генерації. Наприклад:
+{{
+  "response": "Маю недостатні вказівки."
+}}
 
 **ДОСТУПНІ ДЖЕРЕЛА:**
 {context_text}
@@ -95,6 +99,8 @@ def _build_prompt_with_context(message_text: str, context_text: str, reasoning_s
 
 **ЗАПИТ КОРИСТУВАЧА:**
 {message_text}
+
+
 
 Відповідай українською мовою. Вкажи у `referenced_sources` всі використані UID."""
 
@@ -113,6 +119,10 @@ def _build_prompt_no_context(message_text: str) -> str:
 1. Чітко сказати що ти не маєш необхідної інформації
 2. Попросити користувача надати потрібну інформацію
 3. Бути чесним про обмеження твоїх знань
+4. Мати structured output з валідним закінченням генерації. Наприклад:
+{{
+  "response": "Маю недостатні вказівки."
+}}
 
 **ЗАПИТ КОРИСТУВАЧА:**
 {message_text}

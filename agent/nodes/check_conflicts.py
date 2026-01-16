@@ -34,7 +34,15 @@ def _extract_similar_facts(results: List[Dict[str, Any]]) -> List[Dict[str, str]
 async def check_conflicts_node(state: AgentState) -> Dict[str, Any]:
 
     logger.info("=== Check Conflicts Node (LEARN) ===")
-    message_text = state["message_text"]
+    
+    # Support for decomposed memory_updates from orchestrator
+    memory_updates = state.get("memory_updates", [])
+    if memory_updates:
+        # Combine all memory updates into one text for conflict checking
+        message_text = "\n".join(memory_updates)
+        logger.info(f"Processing {len(memory_updates)} memory update(s) for conflict check")
+    else:
+        message_text = state["message_text"]
 
     # Embed message
     embedder = _get_embedder()

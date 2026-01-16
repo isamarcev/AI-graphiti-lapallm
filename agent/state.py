@@ -17,12 +17,17 @@ class AgentState(TypedDict):
 
     # Classification
     intent: Optional[Literal["learn", "solve"]]
+    
+    # Decomposition - for mixed messages
+    memory_updates: List[str]  # "remember" actions from decomposer
+    original_message: Optional[str]  # preserve original mixed message
 
     # SOLVE path - TYPED structures
     retrieved_context: List[RetrievedContext]
     react_steps: List[ReactStep]
     conflicts: List[Tuple[str, str]]  # (message_id, fact)
     message_embedding: List[float]
+    validation_attempts: int  # track validator retries
 
     # Output
     response: str
@@ -57,10 +62,13 @@ def create_initial_state(
         user_id=user_id,
         timestamp=timestamp,
         intent=None,
+        memory_updates=[],
+        original_message=None,
         retrieved_context=[],
         react_steps=[],
         conflicts=[],
         message_embedding=[],
+        validation_attempts=0,
         response="",
         references=[],
         reasoning=None

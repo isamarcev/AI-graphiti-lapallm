@@ -1,0 +1,40 @@
+graph TD
+    Start([Start]) --> Classify[Classify/Orchestrator]
+    
+    Classify --> RouteAfterClassify{Has memory_updates?}
+    
+    RouteAfterClassify -->|Yes| CheckConflicts[Check Conflicts]
+    RouteAfterClassify -->|No + solve| RetrieveDirectly[Retrieve Context]
+    RouteAfterClassify -->|No + learn| LearnResponseOnly[Generate Learn Response]
+    
+    CheckConflicts --> HasConflicts{Conflicts found?}
+    
+    HasConflicts -->|Yes| ResolveConflicts[Resolve Conflicts]
+    HasConflicts -->|No| StoreKnowledge[Store Knowledge]
+    
+    ResolveConflicts --> StoreKnowledge
+    
+    StoreKnowledge --> RouteByIntent{Check Intent}
+    
+    RouteByIntent -->|learn ONLY| LearnResponse[Generate Learn Response]
+    RouteByIntent -->|solve or mixed| Retrieve[Retrieve Context]
+    
+    Retrieve --> React[ReAct Agent Loop]
+    RetrieveDirectly --> React
+    
+    React --> SolveResponse[Generate Solve Response]
+    SolveResponse --> Validate[Validator]
+    
+    Validate -->|Valid| EndSolve([End])
+    Validate -->|Invalid Max Retries| EndFallback([End: Need more info])
+    
+    LearnResponse --> EndLearn([End])
+    LearnResponseOnly --> EndLearn
+    
+    classDef newNode fill:#c8e6c9,stroke:#2e7d32,stroke-width:2px
+    classDef conflictNode fill:#ffecb3,stroke:#f57c00,stroke-width:2px
+    classDef existing fill:#e1f5fe,stroke:#01579b,stroke-width:2px
+    
+    class Retrieve,RetrieveDirectly,Validate newNode
+    class CheckConflicts,ResolveConflicts,StoreKnowledge conflictNode
+    class Classify,React,SolveResponse,LearnResponse,LearnResponseOnly existing
