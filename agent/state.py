@@ -12,6 +12,7 @@ class AgentState(TypedDict):
 
     # Input
     message_uid: str
+    system_message_id: int
     message_text: str
     timestamp: datetime
 
@@ -39,6 +40,7 @@ class AgentState(TypedDict):
 def create_initial_state(
     message_uid: str,
     message_text: str,
+    system_message_id: int,
     user_id: str = "default_user",
     timestamp: Optional[datetime] = None
 ) -> AgentState:
@@ -47,6 +49,7 @@ def create_initial_state(
 
     Args:
         message_uid: Unique identifier for the message
+        system_message_id: Unique identifier for the message in the system
         message_text: Content of the message
         user_id: User identifier
         timestamp: Optional timestamp (defaults to now)
@@ -59,6 +62,7 @@ def create_initial_state(
 
     return AgentState(
         message_uid=message_uid,
+        system_message_id=system_message_id,
         message_text=message_text,
         user_id=user_id,
         timestamp=timestamp,

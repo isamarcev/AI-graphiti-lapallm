@@ -2,8 +2,10 @@
 
 run:
 	 uv run uvicorn app:app --reload --port 8080
-up-services:
+up-s:
 	docker compose -f docker-compose.services.yml up
+up-sb:
+	docker compose -f docker-compose.services.yml up --build
 
 graph:
 	uv run python scripts/graph_generate_view.py
