@@ -1,5 +1,4 @@
-
-
+import asyncio
 import logging
 import json
 from typing import Any, Dict, List, Tuple
@@ -30,41 +29,25 @@ def _extract_similar_facts(results: List[Dict[str, Any]]) -> List[Dict[str, str]
     return similar_facts
 
 
-@traceable(name="check_conflicts")
-async def check_conflicts_node(state: AgentState) -> Dict[str, Any]:
+async def process_single_update(
+        update_text: str,
+        idx: int,
+        embedder: Any,
+        llm: Any,
+        qdrant: Any,
+        semaphore: asyncio.Semaphore
+) -> List[Tuple[str, str]]:
     """
-    Check conflicts for each memory_update individually.
-    For each update:
-      1. Vectorize it
-      2. Find 3 nearest neighbors in Qdrant
-      3. Use LLM to detect conflicts
-      4. Mark conflicting neighbors as irrelevant immediately
+    Обробляє один update_text. Повертає список знайдених конфліктів (record_id, fact).
     """
+    async with semaphore:  # Обмежуємо кількість одночасних запитів
+        try:
+            logger.info(f"Start checking update {idx}")
 
-    logger.info("=== Check Conflicts Node (LEARN) ===")
-    
-    memory_updates = state.get("memory_updates", [])
-    if not memory_updates:
-        logger.info("No memory_updates to check for conflicts")
-        return {"conflicts": []}
-
-    logger.info(f"Processing {len(memory_updates)} memory update(s) for conflict check")
-
-    embedder = _get_embedder()
-    llm = get_llm_client()
-    qdrant = await QdrantClient().initialize()
-
-    total_conflicts_resolved = 0
-    all_conflicts: List[Tuple[str, str]] = []  # (record_id, fact) for reporting
-
-    try:
-        for idx, update_text in enumerate(memory_updates, 1):
-            logger.info(f"Checking conflicts for memory_update {idx}/{len(memory_updates)}")
-
-            # 1. Vectorize the update
+            # 1. Vectorize
             vector = await embedder.create(update_text)
 
-            # 2. Find 3 nearest neighbors
+            # 2. Find neighbors
             results = await qdrant.search_similar(
                 query_vector=vector,
                 top_k=3,
@@ -72,22 +55,16 @@ async def check_conflicts_node(state: AgentState) -> Dict[str, Any]:
             )
 
             similar_facts = _extract_similar_facts(results)
-            logger.info(f"Found {len(similar_facts)} similar facts for update {idx}")
-
             if not similar_facts:
-                continue
+                return []
 
-            message_fact_map: Dict[str, str] = {
-                item["record_id"]: item["fact"] for item in similar_facts
-            }
+            message_fact_map = {item["record_id"]: item["fact"] for item in similar_facts}
 
-            # 3. Build prompt for conflict checking
+            # 3. Build Prompt
             facts_lines = "\n".join(
-                [
-                    f"- record_id={item['record_id']}: {item['fact']}"
-                    for item in similar_facts
-                ]
+                [f"- record_id={item['record_id']}: {item['fact']}" for item in similar_facts]
             )
+
             system_prompt = (
                 "Ти інструмент для виявлення суперечностей.\n"
                 "Отримуєш новий факт від користувача та список раніше збережених фактів.\n"
@@ -100,6 +77,7 @@ async def check_conflicts_node(state: AgentState) -> Dict[str, Any]:
                 "Відповідай JSON: {\"conflicts\": [\"record_id1\", \"record_id2\", ...]}"
             )
 
+            # LLM Call
             try:
                 llm_result = await llm.generate_async(
                     messages=[
@@ -108,45 +86,76 @@ async def check_conflicts_node(state: AgentState) -> Dict[str, Any]:
                     ],
                     temperature=0.0,
                 )
-                
-                content = llm_result if isinstance(llm_result, str) else str(llm_result)
-                try:
-                    parsed = json.loads(content)
-                    conflicts = parsed.get("conflicts", [])
-                    if not isinstance(conflicts, list):
-                        conflicts = []
-                except Exception:
-                    conflicts = []
+                content = str(llm_result)
+                parsed = json.loads(content)
+                conflicts_ids = parsed.get("conflicts", [])
+                if not isinstance(conflicts_ids, list):
+                    conflicts_ids = []
             except Exception as e:
                 logger.error(f"Conflict LLM check failed for update {idx}: {e}")
-                conflicts = []
+                return []
 
-            # 4. Mark conflicting records as irrelevant immediately
-            for cid in conflicts:
-                if not isinstance(cid, str):
-                    continue
+            # 4. Resolve conflicts
+            resolved_conflicts = []
+            for cid in conflicts_ids:
+                if not isinstance(cid, str): continue
                 cid_clean = cid.strip()
-                if not cid_clean:
-                    continue
-                
+                if not cid_clean: continue
+
                 if cid_clean in message_fact_map:
                     try:
-                        await qdrant.set_relevance_by_record_id(record_id=cid_clean, is_relevant=False)
-                        logger.info(f"Marked record_id={cid_clean} as irrelevant (conflict with update {idx})")
-                        total_conflicts_resolved += 1
-                        # Track for reporting
-                        all_conflicts.append((cid_clean, message_fact_map[cid_clean]))
+                        # Тут важливо: Qdrant клієнт має бути thread-safe або підтримувати async
+                        await qdrant.set_relevance_by_record_id(record_id=cid_clean,
+                                                                is_relevant=False)
+                        logger.info(
+                            f"Marked record_id={cid_clean} as irrelevant (conflict with update {idx})")
+                        resolved_conflicts.append((cid_clean, message_fact_map[cid_clean]))
                     except Exception as e:
                         logger.error(f"Failed to mark record_id={cid_clean} as irrelevant: {e}")
-                else:
-                    logger.warning(
-                        f"Conflict id from LLM not found in similar facts; skipping",
-                        extra={"record_id": cid_clean},
-                    )
+
+            return resolved_conflicts
+
+        except Exception as e:
+            logger.error(f"Critical error processing update {idx}: {e}")
+            return []
+
+
+@traceable(name="check_conflicts")
+async def check_conflicts_node(state: AgentState) -> Dict[str, Any]:
+    logger.info("=== Check Conflicts Node (LEARN) ===")
+
+    memory_updates = state.get("memory_updates", [])
+    if not memory_updates:
+        return {"conflicts": []}
+
+    embedder = _get_embedder()
+    llm = get_llm_client()
+    qdrant = await QdrantClient().initialize()
+
+    # Створюємо семафор, наприклад, на 5 одночасних запитів
+    semaphore = asyncio.Semaphore(5)
+
+    try:
+        tasks = []
+        for idx, update_text in enumerate(memory_updates, 1):
+            task = process_single_update(
+                update_text=update_text,
+                idx=idx,
+                embedder=embedder,
+                llm=llm,
+                qdrant=qdrant,
+                semaphore=semaphore
+            )
+            tasks.append(task)
+
+        # Запускаємо всі задачі паралельно і чекаємо завершення
+        results_list = await asyncio.gather(*tasks)
+
+        # Об'єднуємо результати (flatten list)
+        all_conflicts = [item for sublist in results_list for item in sublist]
 
     finally:
         await qdrant.close()
 
-    logger.info(f"Resolved {total_conflicts_resolved} conflicts total")
-
+    logger.info(f"Resolved {len(all_conflicts)} conflicts total")
     return {"conflicts": all_conflicts}

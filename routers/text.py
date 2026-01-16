@@ -78,13 +78,13 @@ async def process_text(request: TextRequest) -> TextResponse:
         reasoning = result.get("reasoning")
         
         # Validate response
-        if not response_text:
-            logger.error("Agent returned empty response")
-            raise ValueError("Agent returned empty response")
+        # if not response_text:
+        #     logger.error("Agent returned empty response")
+        #     raise ValueError("Agent returned empty response")
         
         logger.info(f"Returning response with {len(references)} references")
         time_end = datetime.now()
-        logger.info(f"Processing time: {time_end - time_start}")
+        logger.warning(f"Processing time: {time_end - time_start}")
         result = TextResponse(
             response=response_text,
             references=references,
