@@ -32,102 +32,121 @@ def _extract_similar_facts(results: List[Dict[str, Any]]) -> List[Dict[str, str]
 
 @traceable(name="check_conflicts")
 async def check_conflicts_node(state: AgentState) -> Dict[str, Any]:
+    """
+    Check conflicts for each memory_update individually.
+    For each update:
+      1. Vectorize it
+      2. Find 3 nearest neighbors in Qdrant
+      3. Use LLM to detect conflicts
+      4. Mark conflicting neighbors as irrelevant immediately
+    """
 
     logger.info("=== Check Conflicts Node (LEARN) ===")
     
-    # Support for decomposed memory_updates from orchestrator
     memory_updates = state.get("memory_updates", [])
-    if memory_updates:
-        # Combine all memory updates into one text for conflict checking
-        message_text = "\n".join(memory_updates)
-        logger.info(f"Processing {len(memory_updates)} memory update(s) for conflict check")
-    else:
-        message_text = state["message_text"]
-
-    # Embed message
-    embedder = _get_embedder()
-    vector = await embedder.create(message_text)
-
-    # Qdrant search (only is_relevant=True)
-    qdrant = await QdrantClient().initialize()
-    results = await qdrant.search_similar(
-        query_vector=vector,
-        top_k=3,
-        only_relevant=True,
-    )
-
-    await qdrant.close()
-
-    similar_facts = _extract_similar_facts(results)
-    logger.info(f"Found {len(similar_facts)} similar facts")
-
-    if not similar_facts:
+    if not memory_updates:
+        logger.info("No memory_updates to check for conflicts")
         return {"conflicts": []}
 
-    message_fact_map: Dict[str, str] = {
-        item["record_id"]: item["fact"] for item in similar_facts
-    }
+    logger.info(f"Processing {len(memory_updates)} memory update(s) for conflict check")
 
-    # Build prompt for conflict checking
-    facts_lines = "\n".join(
-        [
-            f"- record_id={item['record_id']}: {item['fact']}"
-            for item in similar_facts
-        ]
-    )
-    system_prompt = (
-        "Ти інструмент для виявлення суперечностей.\n"
-        "Отримуєш новий факт від користувача та список раніше збережених фактів.\n"
-        "Поверни JSON зі списком record_id тих фактів, які суперечать новому факту.\n"
-        "Якщо суперечностей немає — поверни порожній список."
-    )
-    user_prompt = (
-        f"Новий факт: \"{message_text}\"\n\n"
-        f"Збережені факти:\n{facts_lines}\n\n"
-        "Відповідай JSON: {\"conflicts\": [\"record_id1\", \"record_id2\", ...]}"
-    )
+    embedder = _get_embedder()
     llm = get_llm_client()
+    qdrant = await QdrantClient().initialize()
 
-    message = [
-        {"role": "system", "content": system_prompt},
-        {"role": "user", "content": user_prompt},
-    ]
+    total_conflicts_resolved = 0
+    all_conflicts: List[Tuple[str, str]] = []  # (record_id, fact) for reporting
+
     try:
-        llm_result = await llm.generate_async(
-            messages=message,
-            temperature=0.0,
-        )
-        
-        content = llm_result if isinstance(llm_result, str) else str(llm_result)
-        try:
-            parsed = json.loads(content)
-            conflicts = parsed.get("conflicts", [])
-            if not isinstance(conflicts, list):
-                conflicts = []
-        except Exception:
-            conflicts = []
-    except Exception as e:
-        logger.error(f"Conflict LLM check failed: {e}")
-        conflicts = []
+        for idx, update_text in enumerate(memory_updates, 1):
+            logger.info(f"Checking conflicts for memory_update {idx}/{len(memory_updates)}")
 
-    # Normalize conflicts to list of (record_id, fact) tuples for AgentState
-    normalized_conflicts: List[Tuple[str, str]] = []
-    for cid in conflicts:
-        if not isinstance(cid, str):
-            continue
-        cid_clean = cid.strip()
-        if not cid_clean:
-            continue
-        fact_text = message_fact_map.get(cid_clean)
-        if fact_text:
-            normalized_conflicts.append((cid_clean, fact_text))
-        else:
-            logger.warning(
-                "Conflict id from LLM not found in similar facts payload; skipping",
-                extra={"record_id": cid_clean},
+            # 1. Vectorize the update
+            vector = await embedder.create(update_text)
+
+            # 2. Find 3 nearest neighbors
+            results = await qdrant.search_similar(
+                query_vector=vector,
+                top_k=3,
+                only_relevant=True,
             )
 
-    return {
-        "conflicts": normalized_conflicts,
-        "message_embedding": vector,
-    }
+            similar_facts = _extract_similar_facts(results)
+            logger.info(f"Found {len(similar_facts)} similar facts for update {idx}")
+
+            if not similar_facts:
+                continue
+
+            message_fact_map: Dict[str, str] = {
+                item["record_id"]: item["fact"] for item in similar_facts
+            }
+
+            # 3. Build prompt for conflict checking
+            facts_lines = "\n".join(
+                [
+                    f"- record_id={item['record_id']}: {item['fact']}"
+                    for item in similar_facts
+                ]
+            )
+            system_prompt = (
+                "Ти інструмент для виявлення суперечностей.\n"
+                "Отримуєш новий факт від користувача та список раніше збережених фактів.\n"
+                "Поверни JSON зі списком record_id тих фактів, які суперечать новому факту.\n"
+                "Якщо суперечностей немає — поверни порожній список."
+            )
+            user_prompt = (
+                f"Новий факт: \"{update_text}\"\n\n"
+                f"Збережені факти:\n{facts_lines}\n\n"
+                "Відповідай JSON: {\"conflicts\": [\"record_id1\", \"record_id2\", ...]}"
+            )
+
+            try:
+                llm_result = await llm.generate_async(
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": user_prompt},
+                    ],
+                    temperature=0.0,
+                )
+                
+                content = llm_result if isinstance(llm_result, str) else str(llm_result)
+                try:
+                    parsed = json.loads(content)
+                    conflicts = parsed.get("conflicts", [])
+                    if not isinstance(conflicts, list):
+                        conflicts = []
+                except Exception:
+                    conflicts = []
+            except Exception as e:
+                logger.error(f"Conflict LLM check failed for update {idx}: {e}")
+                conflicts = []
+
+            # 4. Mark conflicting records as irrelevant immediately
+            for cid in conflicts:
+                if not isinstance(cid, str):
+                    continue
+                cid_clean = cid.strip()
+                if not cid_clean:
+                    continue
+                
+                if cid_clean in message_fact_map:
+                    try:
+                        await qdrant.set_relevance_by_record_id(record_id=cid_clean, is_relevant=False)
+                        logger.info(f"Marked record_id={cid_clean} as irrelevant (conflict with update {idx})")
+                        total_conflicts_resolved += 1
+                        # Track for reporting
+                        all_conflicts.append((cid_clean, message_fact_map[cid_clean]))
+                    except Exception as e:
+                        logger.error(f"Failed to mark record_id={cid_clean} as irrelevant: {e}")
+                else:
+                    logger.warning(
+                        f"Conflict id from LLM not found in similar facts; skipping",
+                        extra={"record_id": cid_clean},
+                    )
+
+    finally:
+        await qdrant.close()
+
+    logger.info(f"Resolved {total_conflicts_resolved} conflicts total")
+
+    return {"conflicts": all_conflicts}

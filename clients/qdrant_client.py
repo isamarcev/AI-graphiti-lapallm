@@ -93,26 +93,26 @@ class QdrantClient:
 
     async def insert_record(
         self,
-        record_id: Optional[str],
         vector: List[float],
         fact: str,
         message_id: str,
         is_relevant: bool,
+        payload: Optional[Dict[str, Any]] = None,
     ):
         """
-        Insert a single record. The provided record_id (string) is stored in payload
-        and converted to a Qdrant-compatible UUID for the point ID.
+        Insert a single record. Generates a new UUID4 point id and stores metadata in payload.
         """
         if self._client is None:
             raise RuntimeError("QdrantClient not initialized. Call initialize() first.")
 
-        point_id = self._to_point_id(record_id)
-        payload = {
+        point_id = uuid.uuid4()
+        base_payload = {
             "fact": fact,
-            "messageid": message_id,
+            "original_message_id": message_id,
             "is_relevant": is_relevant,
-            "record_id": record_id or str(point_id),
         }
+        if payload:
+            base_payload.update(payload)
 
         await self._client.upsert(
             collection_name=self.collection,
@@ -120,7 +120,7 @@ class QdrantClient:
                 qmodels.PointStruct(
                     id=point_id,
                     vector=vector,
-                    payload=payload,
+                    payload=base_payload,
                 )
             ],
         )

@@ -5,13 +5,13 @@ from langgraph.checkpoint.memory import MemorySaver
 from agent.state import AgentState
 from agent.nodes.classify import orchestrator_node
 from agent.nodes.check_conflicts import check_conflicts_node
-from agent.nodes.resolve_conflicts import resolve_conflicts_node
-from agent.nodes.store import store_knowledge_node
 from agent.nodes.retrieve import retrieve_context_node
 from agent.nodes.react import react_loop_node
 from agent.nodes.generate_learn_response import generate_learn_response_node
 from agent.nodes.generate_solve_response import generate_solve_response_node
 from agent.nodes.validate import validate_response_node
+from agent.nodes.store_indexed import store_indexed_facts_node
+from agent.nodes.index_facts import index_facts_node
 
 logger = logging.getLogger(__name__)
 
@@ -89,13 +89,14 @@ def create_agent_graph():
     # Core nodes
     workflow.add_node("classify", orchestrator_node)
     workflow.add_node("check_conflicts", check_conflicts_node)
-    workflow.add_node("resolve_conflicts", resolve_conflicts_node)
-    workflow.add_node("store_knowledge", store_knowledge_node)
+    workflow.add_node("store_knowledge", store_indexed_facts_node)
     workflow.add_node("retrieve_context", retrieve_context_node)
     workflow.add_node("react_loop", react_loop_node)
     workflow.add_node("generate_solve_response", generate_solve_response_node)
     workflow.add_node("validate_response", validate_response_node)
     workflow.add_node("generate_learn_response", generate_learn_response_node)
+    workflow.add_node("store_indexed_facts", store_indexed_facts_node)
+    workflow.add_node("index_facts", index_facts_node)
 
     # Entry point
     workflow.set_entry_point("classify")
@@ -106,28 +107,21 @@ def create_agent_graph():
         "classify",
         route_after_classify,
         {
-            "process_memory": "check_conflicts",  # Start conflict resolution chain
+            "process_memory": "check_conflicts",  # Start with conflict check
             "solve_direct": "retrieve_context",
             "learn_only": "generate_learn_response"
         }
     )
     logger.debug("Added conditional routing from classify")
 
-    # Conflict resolution chain
-    workflow.add_conditional_edges(
-        "check_conflicts",
-        lambda state: "resolve_conflicts" if state.get("conflicts") else "store_knowledge",
-        {
-            "resolve_conflicts": "resolve_conflicts",
-            "store_knowledge": "store_knowledge",
-        },
-    )
-    workflow.add_edge("resolve_conflicts", "store_knowledge")
-    logger.debug("Added conflict resolution chain")
+    # Memory processing chain: check_conflicts → index_facts → store_indexed_fact → learn response
+    workflow.add_edge("check_conflicts", "index_facts")
+    workflow.add_edge("index_facts", "store_indexed_facts")
+    logger.debug("Added memory processing chain")
 
     # After store_knowledge: route by intent
     workflow.add_conditional_edges(
-        "store_knowledge",
+        "store_indexed_facts",
         route_by_intent,
         {
             "learn": "generate_learn_response",
@@ -141,11 +135,12 @@ def create_agent_graph():
     workflow.add_edge("react_loop", "generate_solve_response")
     workflow.add_edge("generate_solve_response", "validate_response")
     workflow.add_edge("validate_response", END)
+    workflow.add_edge("generate_learn_response", END)
+
     logger.debug("Added solve path edges")
 
-    # Learn path
-    workflow.add_edge("generate_learn_response", END)
-    logger.debug("Added learn path edge")
+    # Learn path already handled above
+    logger.debug("Learn path configured")
 
     # Compile with checkpointing for conversation memory
     memory = MemorySaver()

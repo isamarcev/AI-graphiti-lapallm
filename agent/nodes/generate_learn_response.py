@@ -24,40 +24,36 @@ async def generate_learn_response_node(state: AgentState) -> Dict[str, Any]:
     logger.info("=== Generate Learn Response Node ===")
     
     # Get the data from state
-    memory_updates = state.get("memory_updates", [])
+    indexed_facts = state.get("indexed_facts", [])
     conflicts = state.get("conflicts") or []
-    stored_count = state.get("stored_memories_count", len(memory_updates))
     
-    # Generate response based on what was learned
-    if stored_count == 0:
-        response = "Інформацію не вдалося зберегти."
-        logger.warning("No memories stored")
-    elif stored_count == 1:
-        # Single fact learned
-        if not conflicts:
-            response = "Інформацію збережено."
+    response_parts = []
+    
+    # First part: list stored facts
+    if indexed_facts:
+        fact_list = ", ".join([f'"{item.get("fact", "")}"' for item in indexed_facts if item.get("fact")])
+        if fact_list:
+            response_parts.append(f"Зберіг наступні факти: {fact_list}.")
         else:
-            conflict_facts = ", ".join([f'"{fact}"' for _msg_id, fact in conflicts])
-            response = (
-                f"Інформацію збережено. "
-                f"Попередні факти {conflict_facts} помічені як недійсні."
-            )
+            response_parts.append("Інформацію не вдалося зберегти.")
     else:
-        # Multiple facts learned
-        if not conflicts:
-            response = f"Збережено {stored_count} фактів."
-        else:
-            conflict_count = len(conflicts)
-            response = (
-                f"Збережено {stored_count} фактів. "
-                f"{conflict_count} попередніх фактів помічено як недійсні."
-            )
+        response_parts.append("Інформацію не вдалося зберегти.")
+    
+    # Second part: list conflicts if any
+    if conflicts:
+        conflict_list = ", ".join([f'"{fact}"' for _record_id, fact in conflicts])
+        response_parts.append(
+            f"Наступні факти суперечать вхідній інформації, тому позначені як недійсні: {conflict_list}."
+        )
+    
+    # Concatenate response parts
+    response = " ".join(response_parts)
     
     logger.info(
         "Generated learn response",
         extra={
-            "stored_count": stored_count,
-            "has_conflicts": bool(conflicts),
+            "indexed_facts_count": len(indexed_facts),
+            "conflicts_count": len(conflicts),
             "response_length": len(response)
         }
     )

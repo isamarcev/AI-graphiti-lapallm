@@ -3,7 +3,7 @@ State definition for knowledge-centered agent.
 Defines the structure of data that flows through the graph.
 """
 
-from typing import TypedDict, Literal, Optional, List, Tuple
+from typing import TypedDict, Literal, Optional, List, Tuple, Dict, Any
 from datetime import datetime
 from models.schemas import RetrievedContext, ReactStep
 
@@ -22,6 +22,7 @@ class AgentState(TypedDict):
     memory_updates: List[str]  # "remember" actions from decomposer
     original_message: Optional[str]  # preserve original mixed message
 
+    indexed_facts: List[Dict[str, Any]]  # indexed facts from decomposer
     # SOLVE path - TYPED structures
     retrieved_context: List[RetrievedContext]
     react_steps: List[ReactStep]
@@ -64,6 +65,7 @@ def create_initial_state(
         intent=None,
         memory_updates=[],
         original_message=None,
+        indexed_facts=[],
         retrieved_context=[],
         react_steps=[],
         conflicts=[],
