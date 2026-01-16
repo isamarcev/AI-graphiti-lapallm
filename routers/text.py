@@ -9,6 +9,7 @@ import logging
 from routers.schemas import TextRequest, TextResponse
 from agent.graph import get_agent_app
 from agent.state import create_initial_state
+from db.message_repository import save_message_quick
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -35,20 +36,32 @@ async def process_text(request: TextRequest) -> TextResponse:
     """
     time_start = datetime.now()
     logger.info(f"Processing text request: uid={request.uid}, user={request.user_id}")
-    logger.debug(f"Message: {request.text[:100]}...")
+    logger.info(f"Message: {request.text[:100]}...")
     
     try:
         # Get agent instance
         agent = get_agent_app()
         
+        # Save message to database
+        timestamp = datetime.now()
+        saved_message = await save_message_quick(
+            message_uid=request.uid,
+            user_id=request.user_id,
+            message_text=request.text,
+            timestamp=timestamp,
+            intent=None  # Will be set after classification
+        )
+        logger.info(f"Message saved to database: {saved_message.message_uid}")
+
         # Create initial state
         initial_state = create_initial_state(
             message_uid=request.uid,
             message_text=request.text,
             user_id=request.user_id,
-            timestamp=datetime.now()
+            timestamp=timestamp,
+            system_message_id=saved_message.id
         )
-        
+
         logger.debug("Invoking agent graph...")
         
         # Invoke graph
@@ -72,11 +85,13 @@ async def process_text(request: TextRequest) -> TextResponse:
         logger.info(f"Returning response with {len(references)} references")
         time_end = datetime.now()
         logger.info(f"Processing time: {time_end - time_start}")
-        return TextResponse(
+        result = TextResponse(
             response=response_text,
             references=references,
             reasoning=reasoning
         )
+        logger.info(f"Returning response: {result}")
+        return result
         
     except Exception as e:
         logger.error(f"Agent error: {e}", exc_info=True)

@@ -58,6 +58,21 @@ class Settings(BaseSettings):
         description="Vector distance metric: cosine | dot | euclid"
     )
 
+    # SQLite Database Configuration
+    database_path: str = Field(
+        default="./data/messages.db",
+        description="Path to SQLite database file"
+    )
+    debug: bool = Field(
+        default=False,
+        description="Enable debug mode (SQL logging, etc.)"
+    )
+
+    @property
+    def database_url(self) -> str:
+        """Construct async SQLite URL for SQLAlchemy."""
+        return f"sqlite+aiosqlite:///{self.database_path}"
+
     # Graphiti Configuration
     graphiti_temperature: float = Field(
         default=0.0,
