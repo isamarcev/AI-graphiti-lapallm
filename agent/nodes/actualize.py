@@ -51,37 +51,49 @@ def _build_actualization_prompt(message_text: str, context_items: List[Dict[str,
     """
     context_str = _format_context_for_prompt(context_items)
 
-    system_prompt = """Ти експерт з оцінки релевантності контексту для точних відповідей на запити.
+    system_prompt = """Ти експерт з фільтрації контексту для AI-агента, який відповідає на запити користувачів.
 
-**ТВОЯ ЗАДАЧА:**
-Оціни кожен елемент контексту відносно запиту користувача.
+**МЕТА ФІЛЬТРАЦІЇ:**
+Агент отримає ЛИШЕ релевантний контекст для генерації відповіді. Нерелевантна інформація марнує токени та може спантеличити агента.
 
-**КРИТИЧНІ ПРАВИЛА:**
-1. Позначай як RELEVANT (is_relevant: true) ТІЛЬКИ якщо контекст БЕЗПОСЕРЕДНЬО допомагає відповісти на запит або виконати задачу
-2. Нерелевантна інформація марнує токени та плутає агента - будь консервативним
-3. Якщо сумніваєшся - краще позначити як нерелевантний
-4. relevance_score має відображати впевненість: 1.0 = точно релевантний, 0.0 = точно нерелевантний
+**КОЛИ КОНТЕКСТ РЕЛЕВАНТНИЙ:**
+✓ Контекст містить ПРЯМУ відповідь на запит
+✓ Контекст містить КЛЮЧОВУ інформацію, необхідну для відповіді
+✓ Контекст стосується КОНКРЕТНОЇ сутності/персони з запиту
 
-**ПРИКЛАДИ ОЦІНКИ:**
+**КОЛИ КОНТЕКСТ НЕРЕЛЕВАНТНИЙ:**
+✗ Загальна інформація, яка не стосується конкретного запиту
+✗ Інформація про ІНШИХ людей/сутності/задачі (не тих, про кого питають)
+✗ Інформація про ІНШІ аспекти (питають про їжу, а контекст про роботу)
+✗ Побічний контекст (може бути цікавим, але не відповідає на запит)
+
+**ВАЖЛИВО:**
+- У разі сумнівів - позначай як НЕРЕЛЕВАНТНИЙ (is_relevant: false)
+- Будь консервативним: краще менше контексту, але точного
+- Оцінюй кожен елемент НЕЗАЛЕЖНО від інших
+
+**ПРИКЛАДИ:**
 
 Запит: "Яка столиця України?"
-[0] "Київ - столиця України"
-→ is_relevant: true, relevance_score: 1.0, reason: "Прямо відповідає на запит про столицю"
-
-[1] "Україна знаходиться в Європі"
-→ is_relevant: false, relevance_score: 0.2, reason: "Не стосується питання про столицю"
+[0] "Київ - столиця України" → is_relevant: true (пряма відповідь)
+[1] "Україна знаходиться в Європі" → is_relevant: false (загальна інформація)
+[2] "Київ - найбільше місто України" → is_relevant: false (не про столицю)
 
 Запит: "Що любить їсти Марія?"
-[0] "Марія обожнює борщ"
-→ is_relevant: true, relevance_score: 1.0, reason: "Прямо про улюблену їжу Марії"
+[0] "Марія обожнює борщ і вареники" → is_relevant: true (пряма відповідь про їжу Марії)
+[1] "Марія працює вчителькою" → is_relevant: false (про роботу, не про їжу)
+[2] "Борщ - традиційна українська страва" → is_relevant: false (загальна інформація про борщ)
+[3] "Сестра Марії теж любить борщ" → is_relevant: false (про іншу людину)
 
-[1] "Марія працює вчителькою"
-→ is_relevant: false, relevance_score: 0.1, reason: "Професія не стосується їжі"
+Запит: "Де працює Олег?"
+[0] "Олег працює в IT-компанії" → is_relevant: true (пряма відповідь)
+[1] "Олег живе в Києві" → is_relevant: false (про місце проживання, не роботу)
+[2] "Друг Олега працює в банку" → is_relevant: false (про друга, не про Олега)
 
-[2] "Борщ - традиційна українська страва"
-→ is_relevant: false, relevance_score: 0.3, reason: "Загальна інформація про борщ, не про Марію"
-
-Оціни кожен елемент незалежно та об'єктивно."""
+Запит: "Розкажи про хобі Ірини"
+[0] "Ірина захоплюється фотографією" → is_relevant: true (пряма інформація про хобі)
+[1] "Ірина часто їздить на природу" → is_relevant: false (може бути пов'язано, але не конкретно про хобі)
+[2] "Фотографія - популярне хобі" → is_relevant: false (загальна інформація)"""
 
     user_prompt = f"""**ЗАПИТ КОРИСТУВАЧА:**
 {message_text}
@@ -117,6 +129,7 @@ async def actualize_context_node(state: AgentState) -> Dict[str, Any]:
     # Extract data from state
     message_text = state.get("message_text", "")
     retrieved_context = state.get("retrieved_context", [])
+    return {"actualized_context": retrieved_context}
 
     # Early exit: no context to filter
     if not retrieved_context:
@@ -151,16 +164,12 @@ async def actualize_context_node(state: AgentState) -> Dict[str, Any]:
                 logger.warning(f"Invalid index {idx} from LLM, skipping")
                 continue
 
-            # Keep if relevant and score above threshold
-            if item_assessment.is_relevant and item_assessment.relevance_score >= settings.actualization_min_score:
+            # Keep if relevant
+            if item_assessment.is_relevant:
                 filtered_context.append(retrieved_context[idx])
-                logger.debug(
-                    f"✓ Kept item {idx} (score: {item_assessment.relevance_score:.2f}): {item_assessment.reason}"
-                )
+                logger.debug(f"✓ Kept item {idx} as relevant")
             else:
-                logger.debug(
-                    f"✗ Filtered out item {idx} (score: {item_assessment.relevance_score:.2f}): {item_assessment.reason}"
-                )
+                logger.debug(f"✗ Filtered out item {idx} as not relevant")
 
         # Edge case: if all filtered out, keep top 1 by original Qdrant score
         if not filtered_context and original_count > 0:
@@ -173,12 +182,6 @@ async def actualize_context_node(state: AgentState) -> Dict[str, Any]:
 
         filtered_count = len(filtered_context)
         logger.info(f"Context filtering complete: {original_count} → {filtered_count} items")
-
-        # Log token savings estimate
-        items_removed = original_count - filtered_count
-        if items_removed > 0:
-            estimated_tokens_saved = items_removed * 150  # Rough estimate: 150 tokens per item
-            logger.info(f"Estimated token savings: ~{estimated_tokens_saved} tokens")
 
         return {"actualized_context": filtered_context}
 

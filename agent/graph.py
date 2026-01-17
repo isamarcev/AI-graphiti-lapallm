@@ -5,6 +5,7 @@ from langgraph.checkpoint.memory import MemorySaver
 from agent.state import AgentState
 from agent.nodes.classify import orchestrator_node
 from agent.nodes.check_conflicts import check_conflicts_node
+from agent.nodes.query_analyzer import query_analyzer_node
 from agent.nodes.retrieve import retrieve_context_node
 from agent.nodes.react_simple import react_simple_node
 from agent.nodes.actualize import actualize_context_node
@@ -87,6 +88,7 @@ def create_agent_graph():
     # Core nodes
     workflow.add_node("classify", orchestrator_node)
     workflow.add_node("check_conflicts", check_conflicts_node)
+    workflow.add_node("query_analyzer", query_analyzer_node)
     workflow.add_node("retrieve_context", retrieve_context_node)
     workflow.add_node("actualize_context", actualize_context_node)
     workflow.add_node("react_loop", context_answer_node)
@@ -105,7 +107,7 @@ def create_agent_graph():
         route_after_classify,
         {
             "process_memory": "check_conflicts",  # Start with conflict check
-            "solve_direct": "retrieve_context",
+            "solve_direct": "query_analyzer",  # Analyze query before retrieval
         }
     )
     logger.debug("Added conditional routing from classify")
@@ -121,12 +123,13 @@ def create_agent_graph():
         route_by_intent,
         {
             "learn": END,
-            "solve": "retrieve_context"
+            "solve": "query_analyzer"  # Analyze query before retrieval
         }
     )
     logger.debug("Added conditional routing from store_knowledge")
 
-    # Solve path (linear after retrieval)
+    # Solve path (linear after query analysis)
+    workflow.add_edge("query_analyzer", "retrieve_context")
     workflow.add_edge("retrieve_context", "actualize_context")
     workflow.add_edge("actualize_context", "react_loop")
     workflow.add_edge("react_loop", "generate_solve_response")

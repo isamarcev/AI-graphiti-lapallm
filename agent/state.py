@@ -24,6 +24,7 @@ class AgentState(TypedDict):
 
     indexed_facts: List[Dict[str, Any]]  # indexed facts from decomposer
     # SOLVE path - TYPED structures
+    query_analysis: Optional[Dict[str, Any]]  # query analysis result
     retrieved_context: List[RetrievedContext]
     actualized_context: List[RetrievedContext]  # filtered context after actualization
     react_steps: List[ReactStep]
@@ -70,6 +71,7 @@ def create_initial_state(
         intent=None,
         memory_updates=[],
         indexed_facts=[],
+        query_analysis=None,
         retrieved_context=[],
         actualized_context=[],
         react_steps=[],

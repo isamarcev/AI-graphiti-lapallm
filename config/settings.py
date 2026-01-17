@@ -146,13 +146,6 @@ class Settings(BaseSettings):
         description="Maximum iterations for ReAct loop"
     )
 
-    # Context Actualization
-    actualization_min_score: float = Field(
-        default=0.6,
-        ge=0.0,
-        le=1.0,
-        description="Мінімальний relevance_score для збереження елемента"
-    )
     # Phoenix Observability Configuration
     enable_phoenix: bool = Field(
         default=True,
