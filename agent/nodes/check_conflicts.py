@@ -104,6 +104,7 @@ async def check_conflicts_node(state: AgentState) -> Dict[str, Any]:
                 f"Збережені факти:\n{facts_lines}\n\n"
                 "Відповідай JSON: {\"conflicts\": [\"record_id1\", \"record_id2\", ...]}"
             )
+            
 
             try:
                 llm_result = await llm.generate_async(

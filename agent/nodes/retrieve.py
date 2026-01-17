@@ -52,7 +52,7 @@ async def retrieve_context_node(state: AgentState) -> Dict[str, Any]:
         # Search for relevant context
         search_results = await qdrant.search_similar(
             query_vector=query_vector,
-            top_k=5,  # Get top 5 most relevant facts
+            top_k=20,  # Get top 5 most relevant facts
             only_relevant=True,  # Only return facts marked as relevant
         )
         

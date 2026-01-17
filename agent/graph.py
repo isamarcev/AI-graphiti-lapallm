@@ -13,6 +13,8 @@ from agent.nodes.validate import validate_response_node
 from agent.nodes.store_indexed import store_indexed_facts_node
 from agent.nodes.index_facts import index_facts_node
 from agent.nodes.context_answer import context_answer_node
+from agent.nodes.index_raw import index_raw_node
+from agent.nodes.actualize import actualize_context_node
 
 logger = logging.getLogger(__name__)
 
@@ -91,6 +93,8 @@ def create_agent_graph():
     workflow.add_node("generate_learn_response", generate_learn_response_node)
     workflow.add_node("store_indexed_facts", store_indexed_facts_node)
     workflow.add_node("index_facts", index_facts_node)
+    workflow.add_node("index_raw_facts", index_raw_node)
+    workflow.add_node("actualize_context", actualize_context_node)
 
     # Entry point
     workflow.set_entry_point("classify")
@@ -108,10 +112,12 @@ def create_agent_graph():
     logger.debug("Added conditional routing from classify")
 
     # Memory processing chain: check_conflicts → index_facts → store_indexed_fact → learn response
-    workflow.add_edge("check_conflicts", "index_facts")
-    workflow.add_edge("index_facts", "store_indexed_facts")
-    logger.debug("Added memory processing chain")
-    workflow.add_edge("store_indexed_facts", "generate_learn_response")
+    # workflow.add_edge("check_conflicts", "index_facts")
+    # workflow.add_edge("index_facts", "store_indexed_facts")
+    # logger.debug("Added memory processing chain")
+    # workflow.add_edge("store_indexed_facts", "generate_learn_response")
+    workflow.add_edge("check_conflicts", "index_raw_facts")
+    workflow.add_edge("index_raw_facts", "generate_learn_response")
     # After store_knowledge: route by intent
     workflow.add_conditional_edges(
         "generate_learn_response",
@@ -124,7 +130,8 @@ def create_agent_graph():
     logger.debug("Added conditional routing from store_knowledge")
 
     # Solve path (linear after retrieval)
-    workflow.add_edge("retrieve_context", "react_loop")
+    workflow.add_edge("retrieve_context", "actualize_context")
+    workflow.add_edge("actualize_context", "react_loop")
     workflow.add_edge("react_loop", "generate_solve_response")
     # workflow.add_edge("generate_solve_response", "validate_response")
     # workflow.add_edge("validate_response", END)

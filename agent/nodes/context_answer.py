@@ -29,10 +29,7 @@ async def context_answer_node(state: AgentState) -> Dict[str, Any]:
     
     # Get inputs
     message_text = state.get("message_text", "")
-    retrieved_context = state.get("retrieved_context", [])
-    logger.info("*" * 50)
-    logger.info(f"Retrieved context: {retrieved_context}")
-    logger.info("*" * 50)
+    retrieved_context = state.get("actualized_context", [])
 
     # Format context
     if retrieved_context:
