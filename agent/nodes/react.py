@@ -233,7 +233,7 @@ class PromptBuilder:
             return "(порожньо - нічого не навчили)"
 
         return "\n".join(
-            f"[{i}] ({ctx.get('source_msg_uid', 'unknown')}): {ctx.get('content', '')}"
+            f"(message_uid={ctx.get('source_msg_uid', 'unknown')}): {ctx.get('content', '')}"
             for i, ctx in enumerate(retrieved_context)
         )
 

@@ -108,7 +108,7 @@ class QdrantClient:
         point_id = uuid.uuid4()
         base_payload = {
             "fact": fact,
-            "original_message_id": message_id,
+            "message_id": message_id,
             "is_relevant": is_relevant,
         }
         if payload:
@@ -125,18 +125,16 @@ class QdrantClient:
             ],
         )
 
-    async def set_relevance_by_message_id(self, message_id: str, is_relevant: bool) -> None:
-        """
-        Update is_relevant payload flag for all points matching the given messageid.
-        """
+    async def set_relevance_by_message_id(self, record_id: str, is_relevant: bool) -> None:
+
         if self._client is None:
             raise RuntimeError("QdrantClient not initialized. Call initialize() first.")
 
         filter_condition = qmodels.Filter(
             must=[
                 qmodels.FieldCondition(
-                    key="messageid",
-                    match=qmodels.MatchValue(value=message_id),
+                    key="record_id",
+                    match=qmodels.MatchValue(value=record_id),
                 )
             ]
         )
@@ -162,36 +160,21 @@ class QdrantClient:
         )
 
     async def set_relevance_by_record_id(self, record_id: str, is_relevant: bool) -> None:
-        """Update is_relevant for points matching the stored payload record_id."""
+        """Update is_relevant for a point using its Qdrant point ID directly."""
         if self._client is None:
             raise RuntimeError("QdrantClient not initialized. Call initialize() first.")
 
-        filter_condition = qmodels.Filter(
-            must=[
-                qmodels.FieldCondition(
-                    key="record_id",
-                    match=qmodels.MatchValue(value=record_id),
-                )
-            ]
-        )
-
-        scroll_result = await self._client.scroll(
-            collection_name=self.collection,
-            scroll_filter=filter_condition,
-            limit=100,
-            with_payload=False,
-            with_vectors=False,
-        )
-
-        point_ids = [point.id for point in scroll_result[0]] if scroll_result else []
-        if not point_ids:
-            logger.warning("No Qdrant points found for record_id=%s", record_id)
+        try:
+            # Convert string record_id to UUID (assuming it's already a valid UUID string from Qdrant)
+            point_id = uuid.UUID(record_id)
+        except (ValueError, AttributeError) as e:
+            logger.error(f"Invalid UUID format for record_id={record_id}: {e}")
             return
 
         await self._client.set_payload(
             collection_name=self.collection,
             payload={"is_relevant": is_relevant},
-            points=point_ids,
+            points=[point_id],
         )
 
     async def search_similar(

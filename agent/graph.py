@@ -6,12 +6,13 @@ from agent.state import AgentState
 from agent.nodes.classify import orchestrator_node
 from agent.nodes.check_conflicts import check_conflicts_node
 from agent.nodes.retrieve import retrieve_context_node
-from agent.nodes.react import react_loop_node
+from agent.nodes.react_simple import react_simple_node
 from agent.nodes.generate_learn_response import generate_learn_response_node
 from agent.nodes.generate_solve_response import generate_solve_response_node
 from agent.nodes.validate import validate_response_node
 from agent.nodes.store_indexed import store_indexed_facts_node
 from agent.nodes.index_facts import index_facts_node
+from agent.nodes.context_answer import context_answer_node
 
 logger = logging.getLogger(__name__)
 
@@ -91,7 +92,7 @@ def create_agent_graph():
     workflow.add_node("check_conflicts", check_conflicts_node)
     workflow.add_node("store_knowledge", store_indexed_facts_node)
     workflow.add_node("retrieve_context", retrieve_context_node)
-    workflow.add_node("react_loop", react_loop_node)
+    workflow.add_node("react_loop", context_answer_node)
     workflow.add_node("generate_solve_response", generate_solve_response_node)
     workflow.add_node("validate_response", validate_response_node)
     workflow.add_node("generate_learn_response", generate_learn_response_node)
@@ -133,8 +134,8 @@ def create_agent_graph():
     # Solve path (linear after retrieval)
     workflow.add_edge("retrieve_context", "react_loop")
     workflow.add_edge("react_loop", "generate_solve_response")
-    workflow.add_edge("generate_solve_response", "validate_response")
-    workflow.add_edge("validate_response", END)
+    # workflow.add_edge("generate_solve_response", "validate_response")
+    # workflow.add_edge("validate_response", END)
     workflow.add_edge("generate_learn_response", END)
 
     logger.debug("Added solve path edges")

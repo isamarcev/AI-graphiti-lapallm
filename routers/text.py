@@ -75,7 +75,7 @@ async def process_text(request: TextRequest) -> TextResponse:
         return TextResponse(
             response=response_text,
             references=references,
-            reasoning=reasoning
+            reasoning=""
         )
         
     except Exception as e:
