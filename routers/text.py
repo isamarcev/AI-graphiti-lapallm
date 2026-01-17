@@ -44,14 +44,6 @@ async def process_text(request: TextRequest) -> TextResponse:
         
         # Save message to database
         timestamp = datetime.now()
-        saved_message = await save_message_quick(
-            message_uid=request.uid,
-            user_id=request.user_id,
-            message_text=request.text,
-            timestamp=timestamp,
-            intent=None  # Will be set after classification
-        )
-        logger.info(f"Message saved to database: {saved_message.message_uid}")
 
         # Create initial state
         initial_state = create_initial_state(
@@ -59,7 +51,6 @@ async def process_text(request: TextRequest) -> TextResponse:
             message_text=request.text,
             user_id=request.user_id,
             timestamp=timestamp,
-            system_message_id=saved_message.id
         )
 
         logger.debug("Invoking agent graph...")

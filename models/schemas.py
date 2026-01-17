@@ -280,15 +280,6 @@ class ContextRelevanceItem(BaseModel):
     is_relevant: bool = Field(
         description="Чи релевантний цей контекст для відповіді на запит"
     )
-    relevance_score: float = Field(
-        ge=0.0,
-        le=1.0,
-        description="Впевненість у релевантності (0.0-1.0)"
-    )
-    reason: str = Field(
-        max_length=150,
-        description="Коротке пояснення (1-2 речення)"
-    )
 
 
 class ContextActualizationResult(BaseModel):
@@ -299,4 +290,29 @@ class ContextActualizationResult(BaseModel):
     )
     total_relevant: int = Field(
         description="Кількість релевантних елементів"
+    )
+
+
+class QueryAnalysis(BaseModel):
+    """Аналіз запиту користувача для формування стратегії пошуку."""
+
+    query_type: str = Field(
+        description="Тип запиту: factual_question, task, explanation, comparison, other"
+    )
+    domain: str = Field(
+        description="Предметна область запиту (їжа, робота, хобі, місце, загальне та ін.)"
+    )
+    key_entities: List[str] = Field(
+        description="Ключові сутності у запиті (імена людей, назви місць, об'єкти)",
+        default_factory=list
+    )
+    information_needs: List[str] = Field(
+        description="Чек-лист інформації, необхідної для повної відповіді",
+        min_items=1,
+        max_items=5
+    )
+    search_queries: List[str] = Field(
+        description="Оптимізовані пошукові запити для збору потрібного контексту",
+        min_items=1,
+        max_items=3
     )

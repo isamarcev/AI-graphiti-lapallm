@@ -4,7 +4,6 @@ Filters retrieved context items by relevance using Lapa LLM.
 """
 
 import logging
-import json
 from typing import Dict, Any, List
 from langsmith import traceable
 
@@ -94,14 +93,7 @@ def _build_actualization_prompt(message_text: str, context_items: List[Dict[str,
 Запит: "Розкажи про хобі Ірини"
 [0] "Ірина захоплюється фотографією" → is_relevant: true (пряма інформація про хобі)
 [1] "Ірина часто їздить на природу" → is_relevant: false (може бути пов'язано, але не конкретно про хобі)
-[2] "Фотографія - популярне хобі" → is_relevant: false (загальна інформація)
-
-**ФОРМАТ ВІДПОВІДІ:**
-Поверни ТІЛЬКИ валідний JSON масив без додаткового тексту:
-[
-  {"index": 0, "is_relevant": true, "relevance_score": 0.95},
-  {"index": 1, "is_relevant": false, "relevance_score": 0.2}
-]"""
+[2] "Фотографія - популярне хобі" → is_relevant: false (загальна інформація)"""
 
     user_prompt = f"""**ЗАПИТ КОРИСТУВАЧА:**
 {message_text}
@@ -109,8 +101,7 @@ def _build_actualization_prompt(message_text: str, context_items: List[Dict[str,
 **ДОСТУПНИЙ КОНТЕКСТ ДЛЯ ОЦІНКИ:**
 {context_str}
 
-Оціни релевантність кожного елемента контексту відносно запиту користувача.
-Поверни JSON масив з оцінками:"""
+Оціни релевантність кожного елемента контексту відносно запиту користувача."""
 
     return [
         {"role": "system", "content": system_prompt},
@@ -138,6 +129,7 @@ async def actualize_context_node(state: AgentState) -> Dict[str, Any]:
     # Extract data from state
     message_text = state.get("message_text", "")
     retrieved_context = state.get("retrieved_context", [])
+    return {"actualized_context": retrieved_context}
 
     # Early exit: no context to filter
     if not retrieved_context:
@@ -151,58 +143,20 @@ async def actualize_context_node(state: AgentState) -> Dict[str, Any]:
         # Build prompt
         messages = _build_actualization_prompt(message_text, retrieved_context)
 
-        # Call LLM without structured output
+        # Call LLM with structured output
         llm_client = get_llm_client()
-        raw_response = await llm_client.generate_async(
+        result: ContextActualizationResult = await llm_client.generate_async(
             messages=messages,
             temperature=0.1,  # Low temperature for consistent filtering
-            max_tokens=1000
+            max_tokens=1000,
+            response_format=ContextActualizationResult
         )
 
-        # Parse JSON response manually
-        if isinstance(raw_response, str):
-            # Clean markdown code blocks if present
-            response_text = raw_response.strip()
-            if response_text.startswith("```json"):
-                response_text = response_text[7:]
-            elif response_text.startswith("```"):
-                response_text = response_text[3:]
-            if response_text.endswith("```"):
-                response_text = response_text[:-3]
-            response_text = response_text.strip()
-            
-            try:
-                items_data = json.loads(response_text)
-            except json.JSONDecodeError as e:
-                logger.error(f"Failed to parse JSON response: {e}")
-                logger.debug(f"Raw response: {raw_response[:500]}")
-                # Fallback: keep all context
-                return {"actualized_context": retrieved_context}
-        else:
-            logger.warning(f"Unexpected response type: {type(raw_response)}")
-            return {"actualized_context": retrieved_context}
-
-        # Convert to ContextRelevanceItem objects
-        items = []
-        for item_data in items_data:
-            try:
-                item = ContextRelevanceItem(
-                    index=item_data.get("index", 0),
-                    is_relevant=item_data.get("is_relevant", False),
-                    relevance_score=item_data.get("relevance_score", 0.0),
-                    reason=item_data.get("reason", "")
-                )
-                items.append(item)
-            except Exception as e:
-                logger.warning(f"Failed to parse item {item_data}: {e}")
-                continue
-
-        total_relevant = sum(1 for item in items if item.is_relevant)
-        logger.debug(f"LLM returned {total_relevant} relevant items out of {len(items)}")
+        logger.debug(f"LLM returned {result.total_relevant} relevant items out of {len(result.items)}")
 
         # Filter context based on LLM assessment
         filtered_context = []
-        for item_assessment in items:
+        for item_assessment in result.items:
             idx = item_assessment.index
 
             # Validate index
@@ -213,9 +167,9 @@ async def actualize_context_node(state: AgentState) -> Dict[str, Any]:
             # Keep if relevant
             if item_assessment.is_relevant:
                 filtered_context.append(retrieved_context[idx])
-                logger.debug(f"✓ Kept item {idx} as relevant (score: {item_assessment.relevance_score:.2f})")
+                logger.debug(f"✓ Kept item {idx} as relevant")
             else:
-                logger.debug(f"✗ Filtered out item {idx} as not relevant: {item_assessment.reason}")
+                logger.debug(f"✗ Filtered out item {idx} as not relevant")
 
         # Edge case: if all filtered out, keep top 1 by original Qdrant score
         if not filtered_context and original_count > 0:
