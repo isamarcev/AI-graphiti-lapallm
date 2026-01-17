@@ -23,8 +23,9 @@ def _extract_similar_facts(results: List[Dict[str, Any]]) -> List[Dict[str, str]
     for item in results:
         payload = item.get("payload") or {}
         fact = payload.get("fact")
-        message_id = payload.get("messageid") or payload.get("message_id")
-        record_id = payload.get("record_id")
+        message_id = payload.get("message_id")
+        # Use record_id from payload if available, otherwise use the Qdrant point ID
+        record_id = payload.get("record_id") or str(item.get("id"))
         if fact and record_id:
             similar_facts.append({"fact": fact, "message_id": message_id, "record_id": record_id})
     return similar_facts
@@ -72,6 +73,10 @@ async def check_conflicts_node(state: AgentState) -> Dict[str, Any]:
             )
 
             similar_facts = _extract_similar_facts(results)
+            logger.info("*****"*10)
+
+            logger.info(results)
+            logger.info("*****"*10)
             logger.info(f"Found {len(similar_facts)} similar facts for update {idx}")
 
             if not similar_facts:
@@ -106,7 +111,7 @@ async def check_conflicts_node(state: AgentState) -> Dict[str, Any]:
                         {"role": "system", "content": system_prompt},
                         {"role": "user", "content": user_prompt},
                     ],
-                    temperature=0.0,
+                    temperature=0.001,
                 )
                 
                 content = llm_result if isinstance(llm_result, str) else str(llm_result)

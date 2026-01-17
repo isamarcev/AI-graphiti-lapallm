@@ -10,7 +10,6 @@ from typing import Dict, Any, List
 from agent.state import AgentState
 from clients.qdrant_client import QdrantClient
 from clients.hosted_embedder import HostedQwenEmbedder
-from models.schemas import RetrievedContext
 from langsmith import traceable
 
 logger = logging.getLogger(__name__)
@@ -59,40 +58,32 @@ async def retrieve_context_node(state: AgentState) -> Dict[str, Any]:
         
         logger.info(f"Found {len(search_results)} search results")
         
-        # Convert to RetrievedContext format
-        retrieved_context: List[RetrievedContext] = []
+        # Build context dicts with all payload fields
+        context_dicts = []
         
         for hit in search_results:
             payload = hit.get("payload", {})
             score = hit.get("score", 0.0)
             
-            # Extract fact and source information
+            # Extract all fields from payload
             fact = payload.get("fact", "")
-            message_id = payload.get("messageid") or payload.get("message_id") or "unknown"
+            message_id = payload.get("message_id") or "unknown"
             timestamp = payload.get("timestamp")
+            description = payload.get("description", "")
+            examples = payload.get("examples", "")
             
             if fact:
-                context_item = RetrievedContext(
-                    content=fact,
-                    source_msg_uid=message_id,
-                    timestamp=timestamp,
-                    score=score
-                )
-                retrieved_context.append(context_item)
+                context_dicts.append({
+                    "content": fact,
+                    "source_msg_uid": message_id,
+                    "timestamp": timestamp,
+                    "score": score,
+                    "description": description,
+                    "examples": examples
+                })
                 logger.debug(f"Retrieved: {fact[:50]}... (score: {score:.3f})")
         
-        logger.info(f"Retrieved {len(retrieved_context)} context items")
-        
-        # Convert to dict format for state storage
-        context_dicts = [
-            {
-                "content": ctx.content,
-                "source_msg_uid": ctx.source_msg_uid,
-                "timestamp": ctx.timestamp,
-                "score": ctx.score
-            }
-            for ctx in retrieved_context
-        ]
+        logger.info(f"Retrieved {len(context_dicts)} context items")
         
         return {
             "retrieved_context": context_dicts
