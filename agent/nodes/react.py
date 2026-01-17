@@ -528,10 +528,13 @@ async def react_loop_node(state: AgentState) -> Dict[str, Any]:
     agent = ReactAgent(llm, tool_registry, max_iterations)
 
     # Run ReAct loop
-    retrieved_context = state.get("retrieved_context", [])
+    # Use actualized_context (filtered) if available, fallback to retrieved_context
+    actualized_context = state.get("actualized_context", [])
+    if not actualized_context:
+        actualized_context = state.get("retrieved_context", [])
     task = state["message_text"]
 
-    steps, updated_context = await agent.run(task, retrieved_context)
+    steps, updated_context = await agent.run(task, actualized_context)
 
     # Convert steps to dict format for state
     steps_dict = [
@@ -549,5 +552,5 @@ async def react_loop_node(state: AgentState) -> Dict[str, Any]:
 
     return {
         "react_steps": steps_dict,
-        "retrieved_context": updated_context,
+        "actualized_context": updated_context,
     }

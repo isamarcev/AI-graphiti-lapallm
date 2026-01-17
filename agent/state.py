@@ -12,7 +12,7 @@ class AgentState(TypedDict):
 
     # Input
     message_uid: str
-    system_message_id: int
+    system_message_id: int | None
     message_text: str
     timestamp: datetime
 
@@ -26,6 +26,7 @@ class AgentState(TypedDict):
     indexed_facts: List[Dict[str, Any]]  # indexed facts from decomposer
     # SOLVE path - TYPED structures
     retrieved_context: List[RetrievedContext]
+    actualized_context: List[RetrievedContext]  # filtered context after actualization
     react_steps: List[ReactStep]
     conflicts: List[Tuple[str, str]]  # (message_id, fact)
     message_embedding: List[float]
@@ -40,7 +41,7 @@ class AgentState(TypedDict):
 def create_initial_state(
     message_uid: str,
     message_text: str,
-    system_message_id: int,
+    system_message_id: int | None = None,
     user_id: str = "default_user",
     timestamp: Optional[datetime] = None
 ) -> AgentState:
@@ -71,6 +72,7 @@ def create_initial_state(
         original_message=None,
         indexed_facts=[],
         retrieved_context=[],
+        actualized_context=[],
         react_steps=[],
         conflicts=[],
         message_embedding=[],

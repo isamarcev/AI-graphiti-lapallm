@@ -152,10 +152,14 @@ async def generate_solve_response_node(state: AgentState) -> Dict[str, Any]:
     llm = get_llm_client()
 
     # ТИПІЗОВАНИЙ доступ до даних з runtime конвертацією dict → Pydantic
-    retrieved_context_raw = state["retrieved_context"]
+    # Use actualized_context (filtered) if available, fallback to retrieved_context
+    actualized_context_raw = state.get("actualized_context", [])
+    if not actualized_context_raw:
+        actualized_context_raw = state.get("retrieved_context", [])
+
     retrieved_context: List[RetrievedContext] = [
         RetrievedContext(**ctx) if isinstance(ctx, dict) else ctx
-        for ctx in retrieved_context_raw
+        for ctx in actualized_context_raw
     ]
 
     react_steps_raw = state["react_steps"]

@@ -6,6 +6,7 @@ from agent.state import AgentState
 from agent.nodes.classify import orchestrator_node
 from agent.nodes.check_conflicts import check_conflicts_node
 from agent.nodes.retrieve import retrieve_context_node
+from agent.nodes.actualize import actualize_context_node
 from agent.nodes.react import react_loop_node
 from agent.nodes.generate_learn_response import generate_learn_response_node
 from agent.nodes.generate_solve_response import generate_solve_response_node
@@ -91,6 +92,7 @@ def create_agent_graph():
     workflow.add_node("check_conflicts", check_conflicts_node)
     workflow.add_node("store_knowledge", store_indexed_facts_node)
     workflow.add_node("retrieve_context", retrieve_context_node)
+    workflow.add_node("actualize_context", actualize_context_node)
     workflow.add_node("react_loop", react_loop_node)
     workflow.add_node("generate_solve_response", generate_solve_response_node)
     workflow.add_node("validate_response", validate_response_node)
@@ -131,7 +133,8 @@ def create_agent_graph():
     logger.debug("Added conditional routing from store_knowledge")
 
     # Solve path (linear after retrieval)
-    workflow.add_edge("retrieve_context", "react_loop")
+    workflow.add_edge("retrieve_context", "actualize_context")
+    workflow.add_edge("actualize_context", "react_loop")
     workflow.add_edge("react_loop", "generate_solve_response")
     workflow.add_edge("generate_solve_response", "validate_response")
     workflow.add_edge("validate_response", END)

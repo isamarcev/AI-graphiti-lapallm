@@ -269,3 +269,34 @@ class SolveResponse(BaseModel):
     has_sufficient_info: bool = Field(
         description="True якщо в джерелах була достатня інформація, False якщо ні"
     )
+
+
+class ContextRelevanceItem(BaseModel):
+    """Оценка релевантности одного элемента контекста."""
+
+    index: int = Field(
+        description="Індекс елемента контексту (0-based)"
+    )
+    is_relevant: bool = Field(
+        description="Чи релевантний цей контекст для відповіді на запит"
+    )
+    relevance_score: float = Field(
+        ge=0.0,
+        le=1.0,
+        description="Впевненість у релевантності (0.0-1.0)"
+    )
+    reason: str = Field(
+        max_length=150,
+        description="Коротке пояснення (1-2 речення)"
+    )
+
+
+class ContextActualizationResult(BaseModel):
+    """Результат AI-фільтрації контексту."""
+
+    items: List[ContextRelevanceItem] = Field(
+        description="Оцінки релевантності для кожного елемента"
+    )
+    total_relevant: int = Field(
+        description="Кількість релевантних елементів"
+    )
