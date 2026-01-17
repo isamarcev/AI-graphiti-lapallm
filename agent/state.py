@@ -21,6 +21,7 @@ class AgentState(TypedDict):
     
     # Decomposition - for mixed messages
     memory_updates: List[str]  # "remember" actions from decomposer
+    subtasks: List[str]  # decomposed subtasks from task decomposition
 
     indexed_facts: List[Dict[str, Any]]  # indexed facts from decomposer
     # SOLVE path - TYPED structures
@@ -38,6 +39,8 @@ class AgentState(TypedDict):
     references: List[str]  # message UIDs
     reasoning: Optional[str]
 
+    actualized_context: List[RetrievedContext]
+
 
 def create_initial_state(
     message_uid: str,
@@ -51,7 +54,6 @@ def create_initial_state(
 
     Args:
         message_uid: Unique identifier for the message
-        system_message_id: Unique identifier for the message in the system
         message_text: Content of the message
         user_id: User identifier
         timestamp: Optional timestamp (defaults to now)
@@ -70,6 +72,7 @@ def create_initial_state(
         timestamp=timestamp,
         intent=None,
         memory_updates=[],
+        subtasks=[],
         indexed_facts=[],
         query_analysis=None,
         retrieved_context=[],
@@ -81,5 +84,5 @@ def create_initial_state(
         solve_response="",
         response="",
         references=[],
-        reasoning=None
+        reasoning=None,
     )
