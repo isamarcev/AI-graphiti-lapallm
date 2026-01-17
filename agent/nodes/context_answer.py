@@ -88,7 +88,7 @@ async def context_answer_node(state: AgentState) -> Dict[str, Any]:
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt}
             ],
-            temperature=0.0
+            temperature=0.001
         )
         
         logger.info(f"Generated response: {response[:100]}...")
@@ -98,6 +98,5 @@ async def context_answer_node(state: AgentState) -> Dict[str, Any]:
         response = "Помилка генерації відповіді"
     
     return {
-        "response": response,
-        "react_steps": []
+        "solve_response": response
     }

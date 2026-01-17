@@ -62,7 +62,7 @@ async def index_facts_node(state: AgentState) -> Dict[str, Any]:
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": build_user_prompt(update_text)},
                 ],
-                temperature=0.2,
+                temperature=0.001,
             )
 
             if isinstance(raw, str):

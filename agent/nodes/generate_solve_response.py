@@ -46,10 +46,12 @@ async def generate_solve_response_node(state: AgentState) -> Dict[str, Any]:
     """
     logger.info("=== Generate Solve Response Node ===")
 
-    response = state.get("response", "")
-    
+    solve_response = state.get("solve_response", "")
+    learn_response = state.get("learn_response", "")
     # Extract references from response
-    references = extract_references(response)
+    references = extract_references(solve_response)
+
+    response = solve_response + "\n\n" + learn_response
     logger.info(f"Extracted {len(references)} references: {references}")
 
     return {

@@ -73,7 +73,7 @@ async def orchestrator_node(state: AgentState) -> dict:
                     "content": f"Повідомлення для класифікації:\n\n\"{message_text}\"\n\nЯкий це тип: 'запам'ятай' чи 'виріши'?"
                 }
             ],
-            temperature=0.0
+            temperature=0.001
         )
         
         # Parse intent from response

@@ -69,4 +69,4 @@ async def store_indexed_facts_node(state: AgentState) -> Dict[str, Any]:
         await qdrant.close()
 
     logger.info(f"Stored {stored_count} indexed facts total")
-    return {"message_embedding": last_vector or []}
+    return {}

@@ -111,7 +111,7 @@ async def check_conflicts_node(state: AgentState) -> Dict[str, Any]:
                         {"role": "system", "content": system_prompt},
                         {"role": "user", "content": user_prompt},
                     ],
-                    temperature=0.0,
+                    temperature=0.001,
                 )
                 
                 content = llm_result if isinstance(llm_result, str) else str(llm_result)

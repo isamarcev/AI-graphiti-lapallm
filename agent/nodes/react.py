@@ -358,7 +358,7 @@ class ReactAgent:
             # Try structured output first
             structured = await self.llm.generate_async(
                 messages=[{"role": "user", "content": prompt}],
-                temperature=0.3,
+                temperature=0.01,
                 max_tokens=300,
                 response_format=ReactThought
             )
