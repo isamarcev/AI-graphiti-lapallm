@@ -58,4 +58,4 @@ async def generate_learn_response_node(state: AgentState) -> Dict[str, Any]:
         }
     )
     
-    return {"response": response}
+    return {"learn_response": response, "response": response}

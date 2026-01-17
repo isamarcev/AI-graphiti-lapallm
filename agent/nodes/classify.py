@@ -1,149 +1,111 @@
 """
-Node 1 (Revised): Intent Decomposition & Orchestrator
-Breaks down complex mixed messages into atomic actions:
-1. Memory Updates (Learn/Correct)
-2. Task Executions (Solve)
+Node 1: Simple Intent Classification
+Determines if message is LEARN (store facts) or SOLVE (answer questions).
 """
-import asyncio
 import logging
-from typing import List, Literal, Optional
-import dspy
+from typing import Literal
 from pydantic import BaseModel, Field
 
 from agent.state import AgentState
-from config.settings import settings
+from agent.storage.message_store import get_message_store
+from clients.llm_client import get_llm_client
 from langsmith import traceable
 
 logger = logging.getLogger(__name__)
 
-# ============================================================================
-# DSPy Models for Decomposition
-# ============================================================================
 
-class ActionItem(BaseModel):
-    """Atomic unit of work derived from user message."""
-    action_type: Literal["remember", "execute"] = Field(
-        ...,
-        description="'remember' for facts, rules, corrections. 'execute' for questions, tasks, requests."
-    )
-    content: str = Field(
-        ...,
-        description="The extracted text content relevant to this action."
-    )
-    context_needed: bool = Field(
-        False,
-        description="For 'execute': does this task require looking up information?"
+class IntentClassification(BaseModel):
+    """Classification of user message intent."""
+    intent: Literal["learn", "solve"] = Field(
+        description="'learn' if user is providing facts/information to remember. 'solve' if user is asking questions or requesting tasks."
     )
 
-class DecomposeSignature(dspy.Signature):
-    """
-    Ти — аналітичний модуль універсального AI-агента.
-    Твоя мета: Розбити вхідне повідомлення на список атомарних дій.
 
-    Категорії дій:
-    1. REMEMBER: Будь-яка інформація, яку користувач стверджує, надає як факт, або виправляє.
-       - "Мій улюблений колір рожевий" -> ТІЛЬКИ remember
-       - "У Кості Пупкіна коротка шия" -> ТІЛЬКИ remember
-       - "Ти помилився, тут має бути Х" -> remember (це корекція знань)
-       - "Ось документація: ..." -> remember
-
-    2. EXECUTE: Будь-яке ЯВНЕ прохання щось зробити, порахувати, написати або відповісти на питання.
-       - "Напиши функцію..." -> execute
-       - "Яка погода?" -> execute
-       - "Скільки буде 2+2?" -> execute
-
-    КРИТИЧНО ВАЖЛИВО:
-    - Якщо повідомлення містить ТІЛЬКИ факти/твердження БЕЗ питань або прохань - створюй ТІЛЬКИ remember дії.
-    - НЕ додавай execute дії, якщо користувач не ставить питання і не просить щось зробити.
-    - Чисті декларативні речення (твердження) = ТІЛЬКИ remember, БЕЗ execute.
-    
-    Зберігай оригінальні формулювання та деталі в полі content.
-    """
-    message: str = dspy.InputField(desc="Raw user message containing mixed intents")
-    actions: List[ActionItem] = dspy.OutputField(desc="List of atomic actions to take")
-
-class DecomposerModule(dspy.Module):
-    def __init__(self):
-        super().__init__()
-        self.prog = dspy.ChainOfThought(DecomposeSignature)
-
-    def forward(self, message: str):
-        return self.prog(message=message)
-
-# ============================================================================
-# Node Implementation
-# ============================================================================
-
-
-# Define a helper function to run inside the thread
-def _run_decomposition(message: str, lm_instance: dspy.LM):
-    """
-    Runs the DSPy module inside a thread-safe context.
-    This function blocks, so it must be run via asyncio.to_thread.
-    """
-    # Apply the settings ONLY for this specific execution scope
-    with dspy.context(lm=lm_instance):
-        decomposer = DecomposerModule()
-        return decomposer(message)
-
-@traceable(name="orchestrate_message")
+@traceable(name="classify_intent")
 async def orchestrator_node(state: AgentState) -> dict:
     """
-    Node 1: Parses message and orchestrates memory updates BEFORE task execution.
+    Classify message intent as LEARN or SOLVE.
+    
+    - LEARN: User provides facts, information, corrections to store
+    - SOLVE: User asks questions or requests tasks
     """
-    logger.info("=== Orchestrator Node (Universal) ===")
+    logger.info("=== Intent Classification Node ===")
 
-    # 1. Initialize LM
-    lm = dspy.LM(model=f"openai/{settings.model_name}", api_key=settings.api_key,
-                 api_base=settings.lapa_url)
-
-    # REMOVED: dspy.configure(lm=lm)
+    # Store raw message in KV store FIRST
+    message_store = get_message_store()
+    message_store.store(
+        message_uid=state["message_uid"],
+        raw_message=state["message_text"],
+        timestamp=state["timestamp"]
+    )
+    logger.info(f"Stored raw message {state['message_uid']} in message store")
 
     message_text = state["message_text"]
-
-    # 2. Decompose Message using Context Manager
+    
+    # Use LLM to classify intent
+    llm_client = get_llm_client()
+    
     try:
-        # We pass the lm object to the thread and apply context THERE
-        prediction = await asyncio.to_thread(_run_decomposition, message_text, lm)
+        response = await llm_client.generate_async(
+            messages=[
+                {
+                    "role": "system",
+                    "content": """Визнач намір повідомлення користувача:
 
-        actions = prediction.actions
-        logger.info(f"Decomposed into {len(actions)} actions")
+запам'ятай: Користувач надає факти, інформацію,
+Приклади:
+- "Мій улюблений колір рожевий"
+- "Запам'ятай, що Іван працює в Google"
+- "Столиця Франції - Париж"
+
+виріши: Користувач ставить запитання, просить виконати завдання або потребує щось зробити.
+Приклади:
+- "Який мій улюблений колір?"
+- "Напиши функцію на мовы python для сортування списку. Умови: ..."
+- "Яка сьогодні погода?"
+- "Порахуй 2+2"
+- "Виріши наступну задачу. Задача: ..."
+
+Відповідай ТІЛЬКИ одним словом: 'запам'ятай' або 'виріши'."""
+                },
+                {
+                    "role": "user",
+                    "content": f"Повідомлення для класифікації:\n\n\"{message_text}\"\n\nЯкий це тип: 'запам'ятай' чи 'виріши'?"
+                }
+            ],
+            temperature=0.001
+        )
+        
+        # Parse intent from response
+        intent_text = response.strip().lower()
+        
+        # Check for "learn" in English or Ukrainian variants
+        if "learn" in intent_text or "запам'ятай" in intent_text or "навчатися" in intent_text or "навчання" in intent_text:
+            intent = "learn"
+        # Check for "solve" in English or Ukrainian variants
+        elif "solve" in intent_text or "вирішити" in intent_text or "розв'язати" in intent_text or "вирішення" in intent_text or "виріши" in intent_text:
+            intent = "solve"
+        else:
+            logger.warning(f"Unexpected intent response: {intent_text}, defaulting to 'learn'")
+            intent = "learn"
+            
+            
+        logger.info(f"Classified intent: {intent}")
+        
     except Exception as e:
-        logger.error(f"Decomposition failed: {e}")
-        # Fallback
-        actions = [ActionItem(action_type="execute", content=message_text, context_needed=True)]
-
-    logger.info(f"Decomposition result: {actions}")
-
-    # 3. Separate actions into memory_updates and task_description
-    memory_updates = []
-    task_description = []
-
-    for action in actions:
-        if action.action_type == "remember":
-            logger.info(f"Found REMEMBER action: {action.content}")
-            memory_updates.append(action.content)
-
-        elif action.action_type == "execute":
-            logger.info(f"Found EXECUTE action: {action.content}")
-            task_description.append(action.content)
-
-    # 4. Determine intent and construct response
-    final_task = "\n".join(task_description)
-
-    if not final_task and memory_updates:
-        logger.info("Pure LEARN scenario detected")
+        logger.error(f"Intent classification failed: {e}, defaulting to 'solve'")
+        intent = "solve"
+    
+    # Prepare response based on intent
+    if intent == "learn":
+        logger.info("LEARN intent: adding message to memory_updates")
         return {
             "intent": "learn",
-            "memory_updates": memory_updates,
-            "original_message": message_text
+            "memory_updates": [message_text]
         }
-
-    logger.info(
-        f"SOLVE scenario detected (memory_updates: {len(memory_updates)}, tasks: {len(task_description)})")
-    return {
-        "intent": "solve",
-        "message_text": final_task,
-        "original_message": message_text,
-        "memory_updates": memory_updates
-    }
+    else:
+        logger.info("SOLVE intent: leaving memory_updates empty")
+        return {
+            "intent": "solve",
+            "memory_updates": []
+        }

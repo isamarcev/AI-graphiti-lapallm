@@ -233,7 +233,7 @@ class PromptBuilder:
             return "(порожньо - нічого не навчили)"
 
         return "\n".join(
-            f"[{i}] ({ctx.get('source_msg_uid', 'unknown')}): {ctx.get('content', '')}"
+            f"(message_uid={ctx.get('source_msg_uid', 'unknown')}): {ctx.get('content', '')}"
             for i, ctx in enumerate(retrieved_context)
         )
 
@@ -358,7 +358,7 @@ class ReactAgent:
             # Try structured output first
             structured = await self.llm.generate_async(
                 messages=[{"role": "user", "content": prompt}],
-                temperature=0.3,
+                temperature=0.01,
                 max_tokens=300,
                 response_format=ReactThought
             )

@@ -88,7 +88,7 @@ async def process_text(request: TextRequest) -> TextResponse:
         result = TextResponse(
             response=response_text,
             references=references,
-            reasoning=reasoning
+            reasoning=""
         )
         logger.info(f"Returning response: {result}")
         return result
