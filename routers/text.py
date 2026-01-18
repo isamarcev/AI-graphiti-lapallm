@@ -65,7 +65,7 @@ async def process_text(request: TextRequest) -> TextResponse:
         
         # Extract response
         response_text = result.get("response", "")
-        references = result.get("references", [])
+        references = result.get("sources", [])
         reasoning = result.get("reasoning")
         
         # Validate response

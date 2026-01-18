@@ -120,6 +120,7 @@ async def actualize_context_node(state: AgentState) -> Dict[str, Any]:
         
         # Build relevant context list with full facts
         relevant_context = []
+        sources = []
         for idx in relevant_indexes:
             if 0 <= idx < len(retrieved_context):
                 ctx = retrieved_context[idx]
@@ -127,12 +128,13 @@ async def actualize_context_node(state: AgentState) -> Dict[str, Any]:
                     "content": ctx.get("content", ""),
                     "message_id": ctx.get("message_id", "unknown")
                 })
+                sources.append(ctx.get("message_id", ""))
             else:
                 logger.warning(f"Invalid index {idx} from LLM (max: {len(retrieved_context)-1})")
         
         logger.info(f"Filtered context: {len(relevant_context)}/{original_count} items")
         
-        return {"relevant_context": relevant_context}
+        return {"relevant_context": relevant_context, "sources": sources}
         
     except Exception as e:
         logger.error(f"Error during context actualization: {e}", exc_info=True)
@@ -140,10 +142,12 @@ async def actualize_context_node(state: AgentState) -> Dict[str, Any]:
         
         # Graceful fallback: return all context without brief_fact
         fallback_context = []
+        sources = []
         for ctx in retrieved_context:
             fallback_context.append({
                 "content": ctx.get("content", ""),
                 "message_id": ctx.get("message_id", "unknown")
             })
+            sources.append(ctx.get("message_id", ""))
         
-        return {"relevant_context": fallback_context}
+        return {"relevant_context": fallback_context, "sources": sources}
