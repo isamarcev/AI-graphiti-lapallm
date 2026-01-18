@@ -4,21 +4,16 @@ config:
     curve: linear
 ---
 graph TD;
-	__start__(<p>__start__</p>)
+	__start__([<p>__start__</p>]):::first
 	classify(classify)
 	check_conflicts(check_conflicts)
 	query_analyzer(query_analyzer)
 	retrieve_context(retrieve_context)
-	react_loop(react_loop)
 	generate_solve_response(generate_solve_response)
 	generate_learn_response(generate_learn_response)
-	store_indexed_facts(store_indexed_facts)
-	index_facts(index_facts)
 	index_raw_facts(index_raw_facts)
-	actualize_context(actualize_context)
-	__end__(<p>__end__</p>)
+	__end__([<p>__end__</p>]):::last
 	__start__ --> classify;
-	actualize_context --> react_loop;
 	check_conflicts --> index_raw_facts;
 	classify -. &nbsp;process_memory&nbsp; .-> check_conflicts;
 	classify -. &nbsp;solve_direct&nbsp; .-> query_analyzer;
@@ -26,8 +21,7 @@ graph TD;
 	generate_learn_response -. &nbsp;solve&nbsp; .-> query_analyzer;
 	index_raw_facts --> generate_learn_response;
 	query_analyzer --> retrieve_context;
-	react_loop --> generate_solve_response;
-	retrieve_context --> actualize_context;
+	retrieve_context --> generate_solve_response;
 	generate_solve_response --> __end__;
 	classDef default fill:#f2f0ff,line-height:1.2
 	classDef first fill-opacity:0

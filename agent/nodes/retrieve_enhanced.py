@@ -9,6 +9,7 @@ Enhanced Context Retriever Node з Multi-Source Queries та RRF Fusion
 """
 
 import logging
+import asyncio
 from typing import Dict, Any, List
 from collections import defaultdict
 
@@ -188,31 +189,46 @@ async def retrieve_context_enhanced_node(state: AgentState) -> Dict[str, Any]:
     logger.info(f"Unique queries: {queries}")
 
     # ========================================
-    # 2. ВИКОНАННЯ ПОШУКУ ДЛЯ КОЖНОГО ЗАПИТУ
+    # 2. ПАРАЛЕЛЬНЕ ВИКОНАННЯ ПОШУКУ
     # ========================================
+    # Оптимізація: batch embeddings + parallel Qdrant queries
+    # Замість N послідовних пар (embed + search) робимо:
+    # 1. Один batch embedding call для всіх queries
+    # 2. Паралельні Qdrant searches
 
     embedder = HostedQwenEmbedder()
     qdrant = QdrantClient()
     await qdrant.initialize()
 
     try:
-        results_per_query = []
+        # --- STEP 1: Batch embeddings (1 API call замість N) ---
+        logger.info(f"Creating embeddings for {len(queries)} queries (batch)...")
+        query_vectors = await embedder.create_batch(queries)
+        logger.info(f"Embeddings created: {len(query_vectors)} vectors")
 
-        for idx, query in enumerate(queries):
-            logger.info(f"Query {idx + 1}/{len(queries)}: '{query}'")
-
-            # Generate embedding
-            query_vector = await embedder.create(query)
-
-            # Search (збільшили top_k з 3 до 5)
-            search_results = await qdrant.search_similar(
-                query_vector=query_vector,
-                top_k=5,  # було 3, стало 5
+        # --- STEP 2: Parallel Qdrant searches ---
+        async def search_single(idx: int, query: str, vector: List[float]) -> List[Dict]:
+            """Search for a single query."""
+            results = await qdrant.search_similar(
+                query_vector=vector,
+                top_k=3,
                 only_relevant=True,
             )
+            logger.debug(f"Query {idx + 1}: '{query[:30]}...' → {len(results)} results")
+            return results
 
-            logger.info(f"  → Found {len(search_results)} results")
-            results_per_query.append(search_results)
+        logger.info(f"Executing {len(queries)} parallel Qdrant searches...")
+
+        # Паралельний пошук для всіх queries
+        search_tasks = [
+            search_single(idx, query, vector)
+            for idx, (query, vector) in enumerate(zip(queries, query_vectors))
+        ]
+        results_per_query = await asyncio.gather(*search_tasks)
+
+        # Логування результатів
+        for idx, (query, results) in enumerate(zip(queries, results_per_query)):
+            logger.info(f"Query {idx + 1}/{len(queries)}: '{query}' → {len(results)} results")
 
         total_raw_results = sum(len(r) for r in results_per_query)
         logger.info(f"Total raw results: {total_raw_results}")

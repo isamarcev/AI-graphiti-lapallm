@@ -6,7 +6,6 @@ from agent.state import AgentState
 from agent.nodes.classify import orchestrator_node
 from agent.nodes.check_conflicts import check_conflicts_node
 from agent.nodes.query_analyzer import query_analyzer_node
-from agent.nodes.retrieve import retrieve_context_node
 from agent.nodes.retrieve_enhanced import retrieve_context_enhanced_node
 from agent.nodes.generate_learn_response import generate_learn_response_node
 from agent.nodes.generate_solve_response import generate_solve_response_node

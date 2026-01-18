@@ -26,42 +26,51 @@ Reranker Client - CPU-based cross-encoder for context reranking.
 """
 
 import logging
+import threading
 from typing import Dict, Any, List, Optional
-from functools import lru_cache
 
 from config.settings import get_settings
 
 logger = logging.getLogger(__name__)
 
-# Глобальний стан для lazy loading
+# Thread-safe singleton для reranker
 _reranker_model = None
+_reranker_lock = threading.Lock()
 _reranker_available = None
+_availability_checked = False
 
 
 def _check_reranker_available() -> bool:
-    """Перевіряє чи доступний sentence-transformers."""
-    global _reranker_available
+    """Перевіряє чи доступний sentence-transformers (thread-safe)."""
+    global _reranker_available, _availability_checked
 
-    if _reranker_available is not None:
+    if _availability_checked:
         return _reranker_available
 
-    try:
-        from sentence_transformers import CrossEncoder
-        _reranker_available = True
-        logger.info("sentence-transformers available for reranking")
-    except ImportError:
-        _reranker_available = False
-        logger.warning(
-            "sentence-transformers not installed. Reranker disabled. "
-            "Install with: pip install sentence-transformers"
-        )
+    with _reranker_lock:
+        # Double-check після отримання lock
+        if _availability_checked:
+            return _reranker_available
+
+        try:
+            from sentence_transformers import CrossEncoder
+            _reranker_available = True
+            logger.info("sentence-transformers available for reranking")
+        except ImportError:
+            _reranker_available = False
+            logger.warning(
+                "sentence-transformers not installed. Reranker disabled. "
+                "Install with: pip install sentence-transformers"
+            )
+
+        _availability_checked = True
 
     return _reranker_available
 
 
 def get_reranker():
     """
-    Lazy-load CrossEncoder model.
+    Get or create singleton CrossEncoder model (thread-safe).
 
     Returns:
         CrossEncoder instance або None якщо недоступний/вимкнений
@@ -79,8 +88,16 @@ def get_reranker():
     if not _check_reranker_available():
         return None
 
-    # Lazy load моделі
-    if _reranker_model is None:
+    # Fast path: модель вже завантажена
+    if _reranker_model is not None:
+        return _reranker_model
+
+    # Slow path: thread-safe завантаження
+    with _reranker_lock:
+        # Double-check після отримання lock
+        if _reranker_model is not None:
+            return _reranker_model
+
         from sentence_transformers import CrossEncoder
 
         model_name = settings.reranker_model
@@ -98,6 +115,18 @@ def get_reranker():
             return None
 
     return _reranker_model
+
+
+def preload_reranker() -> bool:
+    """
+    Preload reranker model at startup.
+    Call this during app initialization to avoid cold start latency.
+
+    Returns:
+        True if model loaded successfully, False otherwise
+    """
+    model = get_reranker()
+    return model is not None
 
 
 async def rerank_contexts(
