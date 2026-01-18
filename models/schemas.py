@@ -306,6 +306,11 @@ class QueryAnalysis(BaseModel):
         description="Ключові сутності у запиті (імена людей, назви місць, об'єкти)",
         default_factory=list
     )
+    required_tools_or_methods: List[str] = Field(
+        description="Інструменти, методи чи технології згадані в запиті (якщо є). Приклади: назви інструментів, методів, технологій, матеріалів",
+        default_factory=list,
+        max_items=3
+    )
     information_needs: List[str] = Field(
         description="Чек-лист інформації, необхідної для повної відповіді",
         min_items=1,
@@ -314,5 +319,5 @@ class QueryAnalysis(BaseModel):
     search_queries: List[str] = Field(
         description="Оптимізовані пошукові запити для збору потрібного контексту",
         min_items=1,
-        max_items=3
+        max_items=5
     )

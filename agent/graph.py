@@ -6,14 +6,13 @@ from agent.state import AgentState
 from agent.nodes.classify import orchestrator_node
 from agent.nodes.check_conflicts import check_conflicts_node
 from agent.nodes.query_analyzer import query_analyzer_node
-from agent.nodes.retrieve import retrieve_context_node
-from agent.nodes.react_simple import react_simple_node
-from agent.nodes.actualize import actualize_context_node
-from agent.nodes.react import react_loop_node
+from agent.nodes.retrieve_enhanced import retrieve_context_enhanced_node
 from agent.nodes.generate_learn_response import generate_learn_response_node
 from agent.nodes.generate_solve_response import generate_solve_response_node
 from agent.nodes.index_raw import index_raw_node
-from agent.nodes.actualize import actualize_context_node
+# NOTE: actualize_context видалено для оптимізації (Варіант A)
+# LLM-фільтрація замінена на reranker або пряму передачу в generate_solve_response
+# from agent.nodes.actualize import actualize_context_node
 
 logger = logging.getLogger(__name__)
 
@@ -87,15 +86,15 @@ def create_agent_graph():
     workflow.add_node("classify", orchestrator_node)
     workflow.add_node("check_conflicts", check_conflicts_node)
     workflow.add_node("query_analyzer", query_analyzer_node)
-    workflow.add_node("retrieve_context", retrieve_context_node)
-    # workflow.add_node("actualize_context", actualize_context_node)
-    workflow.add_node("react_loop", context_answer_node)
+    workflow.add_node("retrieve_context", retrieve_context_enhanced_node)
+    # workflow.add_node("react_loop", context_answer_node)
     workflow.add_node("generate_solve_response", generate_solve_response_node)
     workflow.add_node("generate_learn_response", generate_learn_response_node)
-    workflow.add_node("store_indexed_facts", store_indexed_facts_node)
-    workflow.add_node("index_facts", index_facts_node)
+    # workflow.add_node("store_indexed_facts", store_indexed_facts_node)
+    # workflow.add_node("index_facts", index_facts_node)
     workflow.add_node("index_raw_facts", index_raw_node)
-    workflow.add_node("actualize_context", actualize_context_node)
+    # NOTE: actualize_context видалено - generate_solve_response сам аналізує релевантність
+    # workflow.add_node("actualize_context", actualize_context_node)
 
     # Entry point
     workflow.set_entry_point("classify")
@@ -131,10 +130,11 @@ def create_agent_graph():
     logger.debug("Added conditional routing from store_knowledge")
 
     # Solve path (linear after query analysis)
+    # NOTE: actualize_context видалено - пряма передача в generate_solve_response
+    # Економія: -1 LLM виклик (~30-50% латентності)
     workflow.add_edge("query_analyzer", "retrieve_context")
-    workflow.add_edge("retrieve_context", "actualize_context")
-    workflow.add_edge("actualize_context", "react_loop")
-    workflow.add_edge("react_loop", "generate_solve_response")
+    workflow.add_edge("retrieve_context", "generate_solve_response")
+    # workflow.add_edge("react_loop", "generate_solve_response")
     # workflow.add_edge("generate_solve_response", "validate_response")
     # workflow.add_edge("validate_response", END)
     workflow.add_edge("generate_learn_response", END)

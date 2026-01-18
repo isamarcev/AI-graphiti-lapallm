@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from routers.text import router as text_router
 from config.logging_config import configure_logging
 from config.phoenix_config import setup_phoenix_instrumentation
+from clients.reranker import preload_reranker
 # from db.simple_init import init_database
 import logging
 
@@ -37,6 +38,17 @@ async def lifespan(app: FastAPI):
         setup_langsmith()
     except Exception as e:
         logger.warning(f"Phoenix setup warning: {e}")
+
+    # Startup: Preload reranker model to avoid cold start latency
+    logger.info("Preloading reranker model...")
+    try:
+        if preload_reranker():
+            logger.info("✓ Reranker model preloaded")
+        else:
+            logger.info("ℹ Reranker disabled or unavailable")
+    except Exception as e:
+        logger.warning(f"Reranker preload warning: {e}")
+
     yield
 
 # Create FastAPI application
