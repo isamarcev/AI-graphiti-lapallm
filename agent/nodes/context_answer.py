@@ -10,6 +10,7 @@ from typing import Any, Dict
 from agent.state import AgentState
 from clients.llm_client import get_llm_client
 from langsmith import traceable
+from config.settings import settings
 
 logger = logging.getLogger(__name__)
 
@@ -29,50 +30,40 @@ async def context_answer_node(state: AgentState) -> Dict[str, Any]:
     
     # Get inputs
     message_text = state.get("message_text", "")
-    retrieved_context = state.get("actualized_context", [])
-
-    # Format context
-    if retrieved_context:
-        context_parts = []
-        for i, ctx in enumerate(retrieved_context, 1):
-            content = ctx.get("content", "") or ctx.get("fact", "")
-            description = ctx.get("description", "")
-            examples = ctx.get("examples", "")
-            source = ctx.get("source_msg_uid") or ctx.get("messageid") or "unknown"
-            
-            part = f"{i}. Факт: {content}"
-            if description:
-                part += f"\n   Опис: {description}"
-            if examples:
-                # examples can be string or list
-                if isinstance(examples, list):
-                    part += f"\n   Приклади: {', '.join(examples)}"
-                else:
-                    part += f"\n   Приклади: {examples}"
-            part += f"\n   [джерело: {source}]"
-            context_parts.append(part)
-        context_text = "\n\n".join(context_parts)
+    relevant_context_list = state.get("relevant_context", [])
+    plan = state.get("plan", "")
+    
+    # Format relevant_context list into string
+    if not relevant_context_list:
+        context_string = "(контекст порожній)"
     else:
-        context_text = "(контекст порожній)"
-    logger.info("*" * 50)
-    logger.info(f"Retrieved context: {context_text}")
-    logger.info("*" * 50)
-    # Build prompt
+        context_parts = []
+        for i, ctx in enumerate(relevant_context_list, 1):
+            content = ctx.get("content", "")
+            message_id = ctx.get("message_id", "unknown")
+            context_parts.append(f"{i}. {content}\n[джерело: {message_id}]")
+        context_string = "\n\n".join(context_parts)
+    
+    logger.info(f"Formatted {len(relevant_context_list)} context items")
+
     system_prompt = """Ти асистент, який відповідає ТІЛЬКИ на основі наданого контексту.
 
 🚫 ЗАБОРОНЕНО використовувати будь-які знання поза контекстом.
 ✅ Відповідай ТІЛЬКИ якщо інформація є в контексті.
 
 ПРАВИЛА:
-1. Якщо відповідь є в контексті → дай коротку відповідь (2-4 речення)
+1. Якщо відповідь є в контексті → дай відповідь
 2. Якщо відповіді НЕМАЄ в контексті → скажи "Не маю інформації про це"
 3. ОБОВ'ЯЗКОВО вказуй джерела у форматі [джерело: X]
 4. Відповідай українською мовою"""
 
     user_prompt = f"""КОНТЕКСТ:
-{context_text}
+{context_string}
 
 ЗАПИТАННЯ: {message_text}
+
+Орієнтовний план виконання:
+{plan}
 
 ВІДПОВІДЬ:"""
 
@@ -85,7 +76,7 @@ async def context_answer_node(state: AgentState) -> Dict[str, Any]:
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt}
             ],
-            temperature=0.001
+            temperature=settings.temperature
         )
         
         logger.info(f"Generated response: {response[:100]}...")

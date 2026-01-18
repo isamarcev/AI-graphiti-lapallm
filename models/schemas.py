@@ -293,15 +293,20 @@ class ContextActualizationResult(BaseModel):
     )
 
 
+class PlanAnalysis(BaseModel):
+    """Аналіз задачі з планом виконання та необхідною інформацією."""
+    
+    plan: str = Field(
+        description="Покроковий план виконання задачі користувача"
+    )
+    required_info: str = Field(
+        description="Детальний опис інформації та теорії, яка потрібна для точного розв'язання задачі"
+    )
+
+
 class QueryAnalysis(BaseModel):
     """Аналіз запиту користувача для формування стратегії пошуку."""
 
-    query_type: str = Field(
-        description="Тип запиту: factual_question, task, explanation, comparison, other"
-    )
-    domain: str = Field(
-        description="Предметна область запиту (їжа, робота, хобі, місце, загальне та ін.)"
-    )
     key_entities: List[str] = Field(
         description="Ключові сутності у запиті (імена людей, назви місць, об'єкти)",
         default_factory=list
@@ -310,6 +315,11 @@ class QueryAnalysis(BaseModel):
         description="Чек-лист інформації, необхідної для повної відповіді",
         min_items=1,
         max_items=5
+    )
+    solve_strategy: List[str] = Field(
+        description="Поетапна стратегія вирішення поставленної задачі",
+        min_items=1,
+        max_items=3
     )
     search_queries: List[str] = Field(
         description="Оптимізовані пошукові запити для збору потрібного контексту",

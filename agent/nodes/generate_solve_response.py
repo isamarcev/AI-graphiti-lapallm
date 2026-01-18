@@ -9,6 +9,7 @@ from typing import Dict, Any, List
 from agent.state import AgentState
 from clients.llm_client import get_llm_client
 from langsmith import traceable
+from config.settings import settings
 
 logger = logging.getLogger(__name__)
 
@@ -73,7 +74,6 @@ async def generate_solve_response_node(state: AgentState) -> Dict[str, Any]:
 
 **ПРАВИЛА:**
 1. Відповідай ТІЛЬКИ на запитання - не додавай зайвої інформації
-2. Будь лаконічним - 2-4 речення максимум
 3. Зберігай всі посилання на джерела у форматі [джерело: X]
 4. Якщо у тексті є кілька тем - витягни ТІЛЬКИ ту, що стосується запитання
 5. Відповідай українською мовою
@@ -87,10 +87,6 @@ async def generate_solve_response_node(state: AgentState) -> Dict[str, Any]:
 Запитання: "Що любить їсти Марія?"
 Текст: "Марія - вчителька математики [джерело: 1]. Вона працює в школі №5. Марія обожнює борщ і вареники [джерело: 2]. У вільний час читає книги."
 Відповідь: "Марія обожнює борщ і вареники [джерело: 2]."
-
-Запитання: "Як працює цикл while в Мавці?"
-Текст: "Мавка - українська мова програмування. Цикл while виконується доки умова істинна [джерело: 1]. Синтаксис: поки умова { код }. Також є цикл for для переборів."
-Відповідь: "Цикл while в Мавці виконується доки умова істинна [джерело: 1]. Синтаксис: поки умова { код }."
 """
 
     user_prompt = f"""**ЗАПИТАННЯ КОРИСТУВАЧА:**
@@ -107,7 +103,7 @@ async def generate_solve_response_node(state: AgentState) -> Dict[str, Any]:
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt}
             ],
-            temperature=0.1,
+            temperature=settings.temperature,
             max_tokens=500
         )
         

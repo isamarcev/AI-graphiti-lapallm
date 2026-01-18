@@ -29,7 +29,7 @@ def route_after_classify(state: AgentState) -> str:
     memory_updates = state.get("memory_updates", [])
     intent = state.get("intent")
     
-    logger.info(f"Routing after classify: memory_updates={len(memory_updates)}, intent={intent}")
+    # logger.info(f"Routing after classify: memory_updates={len(memory_updates)}, intent={intent}")
     
     # If we have memory updates, process them first
     if memory_updates:
@@ -54,13 +54,6 @@ def route_by_intent(state: AgentState) -> str:
     - "solve" -> mixed or pure solve, skip to retrieval for solve response ONLY
     """
     intent = state.get("intent", "solve")
-    
-    logger.info(f"Routing by intent after store_knowledge: {intent}")
-    
-    if intent == "learn":
-        logger.info("→ Routing to generate_learn_response (pure learn)")
-    else:
-        logger.info("→ Routing to retrieve_context (solve - skip learn response to save tokens)")
     
     return intent
 
@@ -132,7 +125,7 @@ def create_agent_graph():
     workflow.add_edge("retrieve_context", "actualize_context")
     workflow.add_edge("actualize_context", "react_loop")
     workflow.add_edge("react_loop", "generate_solve_response")
-    # workflow.add_edge("generate_solve_response", "validate_response")
+    workflow.add_edge("generate_solve_response", END)
     # workflow.add_edge("validate_response", END)
     workflow.add_edge("generate_learn_response", END)
 

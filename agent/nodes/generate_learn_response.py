@@ -31,7 +31,7 @@ async def generate_learn_response_node(state: AgentState) -> Dict[str, Any]:
     
     # First part: list stored facts
     if indexed_facts:
-        fact_list = ", ".join([f'"{item.get("fact", "")}"' for item in indexed_facts if item.get("fact")])
+        fact_list = ", ".join([f'"{item.get("brief_fact", "")}"' for item in indexed_facts if item.get("brief_fact")])
         if fact_list:
             response_parts.append(f"Зберіг наступні факти: {fact_list}.")
         else:

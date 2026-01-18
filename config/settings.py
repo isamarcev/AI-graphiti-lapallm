@@ -32,7 +32,7 @@ class Settings(BaseSettings):
         description="Model name/path for Lapa LLM"
     )
     temperature: float = Field(
-        default=0.7,
+        default=0.001,
         description="Temperature for LLM generation"
     )
     max_tokens: int = Field(
@@ -107,20 +107,6 @@ class Settings(BaseSettings):
     max_react_iterations: int = Field(
         default=3,
         description="Maximum iterations for ReAct loop"
-    )
-
-    # Phoenix Observability Configuration
-    enable_phoenix: bool = Field(
-        default=True,
-        description="Enable Phoenix observability and tracing"
-    )
-    phoenix_collector_endpoint: str = Field(
-        default="http://phoenix:6006",
-        description="Phoenix collector endpoint for traces"
-    )
-    phoenix_project_name: str = Field(
-        default="graphiti-lapa-agent",
-        description="Project name for Phoenix traces"
     )
 
 
