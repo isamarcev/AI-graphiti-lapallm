@@ -39,6 +39,12 @@ async def generate_solve_response_node(state: AgentState) -> Dict[str, Any]:
     retrieved_context = state.get("retrieved_context", []) or state.get("actualized_context", [])
     learn_response = state.get("learn_response", "") # Якщо є додаткова інформація з пам'яті
 
+    # Debug logging
+    logger.info(f"Query: {message_text[:80]}..." if len(message_text) > 80 else f"Query: {message_text}")
+    logger.info(f"Context items: {len(retrieved_context)}")
+    if not retrieved_context:
+        logger.warning("No context retrieved! Response may be poor quality.")
+
     # 1. Підготовка контексту з явними ID
     if retrieved_context:
         context_parts = []
@@ -68,7 +74,7 @@ async def generate_solve_response_node(state: AgentState) -> Dict[str, Any]:
 **КРИТИЧНІ ПРАВИЛА:**
 
 1. **ФОРМАТ ВІДПОВІДІ — НАЙВАЖЛИВІШЕ:**
-   - Якщо користувач вказав конкретний формат (наприклад, ```щось ... ```) — використай САМЕ його.
+   - Якщо користувач вказав конкретний формат (наприклад, ```тег ... ```) — використай САМЕ його.
    - Якщо просить "без пояснень", "тільки результат" — НЕ додавай вступів, коментарів, пояснень.
    - Відповідь має містити ТІЛЬКИ те, що просив користувач.
 
@@ -107,7 +113,7 @@ async def generate_solve_response_node(state: AgentState) -> Dict[str, Any]:
 
 **ГОЛОВНЕ:**
 - Читай запит користувача ДУЖЕ уважно.
-- Дотримуйся формату БУКВАЛЬНО (якщо просять ```special_symbol```, відповідь ОБОВ'ЯЗКОВО в ```special_symbol``` блоці).
+- Дотримуйся формату БУКВАЛЬНО (якщо просять ```тег```, відповідь ОБОВ'ЯЗКОВО в ```тег``` блоці).
 - Перевіряй логічну коректність.
 - НІКОЛИ не змішуй пояснення з результатом у полі response.
 - Пояснення ЗАВЖДИ пиши в reasoning, а не в response.
