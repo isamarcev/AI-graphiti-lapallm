@@ -2,29 +2,6 @@ version: '3.8'
 
 services:
   # ============================================
-  # Phoenix - Observability та Tracing
-  # ============================================
-  phoenix:
-    image: arizephoenix/phoenix:latest
-    container_name: graphiti-lapa-phoenix
-    ports:
-      - "6006:6006"  # Phoenix Web UI
-    environment:
-      - PHOENIX_PORT=6006
-      - PHOENIX_WORKING_DIR=/phoenix
-    volumes:
-      - phoenix_data:/phoenix
-    networks:
-      - graphiti-network
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:6006/healthz').read()"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 40s
-
-  # ============================================
   # Tabula Rasa Agent - Main Application
   # ============================================
   agent:
@@ -36,11 +13,6 @@ services:
       - "3000:3000"  # API endpoint
     env_file:
       - .env
-    environment:
-      # Phoenix observability
-      - ENABLE_PHOENIX=true
-      - PHOENIX_COLLECTOR_ENDPOINT=http://phoenix:6006
-      - PHOENIX_PROJECT_NAME=graphiti-lapa-agent
     volumes:
       # Mount code for live updates during development
       - ./agent:/app/agent
@@ -55,8 +27,6 @@ services:
     command: uvicorn app:app --host 0.0.0.0 --port 3000 --reload
     depends_on:
       qdrant:
-        condition: service_started
-      phoenix:
         condition: service_started
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
@@ -87,8 +57,6 @@ services:
     restart: unless-stopped
 
 volumes:
-  phoenix_data:
-    driver: local
   qdrant_data:
     driver: local
 

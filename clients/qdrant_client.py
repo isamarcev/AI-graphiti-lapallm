@@ -97,10 +97,19 @@ class QdrantClient:
         fact: str,
         message_id: str,
         is_relevant: bool,
+        brief_fact: Optional[str] = None,
         payload: Optional[Dict[str, Any]] = None,
     ):
         """
         Insert a single record. Generates a new UUID4 point id and stores metadata in payload.
+        
+        Args:
+            vector: Embedding vector
+            fact: Full message text
+            message_id: Message identifier
+            is_relevant: Relevance flag
+            brief_fact: Brief extracted fact (optional)
+            payload: Additional metadata
         """
         if self._client is None:
             raise RuntimeError("QdrantClient not initialized. Call initialize() first.")
@@ -111,6 +120,8 @@ class QdrantClient:
             "message_id": message_id,
             "is_relevant": is_relevant,
         }
+        if brief_fact:
+            base_payload["brief_fact"] = brief_fact
         if payload:
             base_payload.update(payload)
 
@@ -217,10 +228,16 @@ class QdrantClient:
         for hit in hits:
             # qdrant-client 1.16.x returns ScoredPoint; defensive tuple/list handling included
             if hasattr(hit, "id") and hasattr(hit, "score"):
-                mapped_results.append(
-                    {"id": hit.id, "score": hit.score, "payload": getattr(hit, "payload", None)}
-                )
+                payload = getattr(hit, "payload", None) or {}
+                mapped_results.append({
+                    "id": hit.id,
+                    "score": hit.score,
+                    "payload": payload,
+                    "fact": payload.get("fact"),
+                    "brief_fact": payload.get("brief_fact"),
+                    "message_id": payload.get("message_id"),
+                })
             elif isinstance(hit, (list, tuple)) and len(hit) >= 2:
-                mapped_results.append({"id": hit[0], "score": hit[1], "payload": None})
+                mapped_results.append({"id": hit[0], "score": hit[1], "payload": None, "fact": None, "brief_fact": None, "message_id": None})
 
         return mapped_results

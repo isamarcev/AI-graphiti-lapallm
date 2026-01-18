@@ -27,7 +27,7 @@ class AgentState(TypedDict):
     # SOLVE path - TYPED structures
     query_analysis: Optional[Dict[str, Any]]  # query analysis result
     retrieved_context: List[RetrievedContext]
-    actualized_context: List[RetrievedContext]  # filtered context after actualization
+    relevant_context: List[Dict[str, Any]]  # filtered context after actualization
     react_steps: List[ReactStep]
     conflicts: List[Tuple[str, str]]  # (message_id, fact)
     validation_attempts: int  # track validator retries
@@ -39,7 +39,8 @@ class AgentState(TypedDict):
     references: List[str]  # message UIDs
     reasoning: Optional[str]
 
-    actualized_context: List[RetrievedContext]
+    plan: str
+    search_queries: List[str]
 
 
 def create_initial_state(
@@ -76,7 +77,7 @@ def create_initial_state(
         indexed_facts=[],
         query_analysis=None,
         retrieved_context=[],
-        actualized_context=[],
+        relevant_context=[],
         react_steps=[],
         conflicts=[],
         validation_attempts=0,
@@ -85,4 +86,6 @@ def create_initial_state(
         response="",
         references=[],
         reasoning=None,
+        plan="",
+        search_queries=[]
     )

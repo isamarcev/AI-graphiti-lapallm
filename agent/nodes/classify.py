@@ -10,6 +10,7 @@ from agent.state import AgentState
 from agent.storage.message_store import get_message_store
 from clients.llm_client import get_llm_client
 from langsmith import traceable
+from config.settings import settings
 
 logger = logging.getLogger(__name__)
 
@@ -73,7 +74,7 @@ async def orchestrator_node(state: AgentState) -> dict:
                     "content": f"Повідомлення для класифікації:\n\n\"{message_text}\"\n\nЯкий це тип: 'запам'ятай' чи 'виріши'?"
                 }
             ],
-            temperature=0.001
+            temperature=settings.temperature
         )
         
         # Parse intent from response

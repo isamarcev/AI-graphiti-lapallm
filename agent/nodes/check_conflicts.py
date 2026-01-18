@@ -10,6 +10,7 @@ from agent.state import AgentState
 from clients.qdrant_client import QdrantClient
 from clients.hosted_embedder import HostedQwenEmbedder
 from clients.llm_client import get_llm_client
+from config.settings import settings
 
 logger = logging.getLogger(__name__)
 
@@ -112,7 +113,7 @@ async def check_conflicts_node(state: AgentState) -> Dict[str, Any]:
                         {"role": "system", "content": system_prompt},
                         {"role": "user", "content": user_prompt},
                     ],
-                    temperature=0.001,
+                    temperature=settings.temperature,
                 )
                 
                 content = llm_result if isinstance(llm_result, str) else str(llm_result)

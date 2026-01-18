@@ -39,13 +39,10 @@ async def retrieve_context_node(state: AgentState) -> Dict[str, Any]:
         return {"retrieved_context": []}
 
     # Визначаємо пошукові запити
-    search_queries = []
-    if query_analysis and query_analysis.get("search_queries"):
-        search_queries = query_analysis["search_queries"]
-        logger.info(f"Using {len(search_queries)} optimized search queries from analysis")
-    else:
+    search_queries = state.get("search_queries", [])
+    if not search_queries:
+        logger.info("No search queries available, using original message_text")
         search_queries = [message_text]
-        logger.info("No query analysis available, using original message_text")
 
     logger.info(f"Search queries: {search_queries}")
 
@@ -90,10 +87,9 @@ async def retrieve_context_node(state: AgentState) -> Dict[str, Any]:
 
             # Extract all fields from payload
             fact = payload.get("fact", "")
+            brief_fact = payload.get("brief_fact", "")
             message_id = payload.get("message_id") or "unknown"
             timestamp = payload.get("timestamp")
-            description = payload.get("description", "")
-            examples = payload.get("examples", "")
 
             # Deduplicate: skip if we already have context from this message
             if message_id in seen_message_ids:
@@ -104,11 +100,10 @@ async def retrieve_context_node(state: AgentState) -> Dict[str, Any]:
                 seen_message_ids.add(message_id)
                 context_dicts.append({
                     "content": fact,
-                    "source_msg_uid": message_id,
+                    "brief_fact": brief_fact,
+                    "message_id": message_id,
                     "timestamp": timestamp,
-                    "score": score,
-                    "description": description,
-                    "examples": examples
+                    "score": score
                 })
                 logger.debug(f"Retrieved: {fact[:50]}... (score: {score:.3f})")
 
