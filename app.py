@@ -4,7 +4,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from routers.text import router as text_router
 from config.logging_config import configure_logging
 from config.phoenix_config import setup_phoenix_instrumentation
-# from db.simple_init import init_database
 import logging
 
 from utils import setup_langsmith
@@ -18,13 +17,6 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     # Startup: Initialize database
     logger.info("Application startup: initializing database...")
-    
-    # try:
-    #     await init_database()
-    #     logger.info("✓ Database initialized")
-    # except Exception as e:
-    #     logger.error(f"Database initialization failed: {e}")
-        # Don't fail startup if DB init fails, just warn
 
     # Startup: Setup Phoenix observability
     logger.info("Setting up Phoenix instrumentation...")
