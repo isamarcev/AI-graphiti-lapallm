@@ -146,6 +146,25 @@ class Settings(BaseSettings):
         description="Maximum iterations for ReAct loop"
     )
 
+    # Reranker Configuration (Optional - для CPU-based reranking замість LLM)
+    # Встановіть True щоб увімкнути, False щоб вимкнути
+    enable_reranker: bool = Field(
+        default=True,
+        description="Enable cross-encoder reranker for context filtering (CPU-based, no LLM tokens)"
+    )
+    reranker_model: str = Field(
+        default="cross-encoder/ms-marco-MiniLM-L-6-v2",
+        description="HuggingFace model for reranking. Рекомендовані: ms-marco-MiniLM-L-6-v2 (швидкий), ms-marco-MiniLM-L-12-v2 (точніший)"
+    )
+    reranker_top_k: int = Field(
+        default=5,
+        description="Кількість документів після reranking"
+    )
+    reranker_min_score: float = Field(
+        default=0.1,
+        description="Мінімальний score для включення документа (0-1 scale)"
+    )
+
     # Phoenix Observability Configuration
     enable_phoenix: bool = Field(
         default=True,

@@ -52,6 +52,12 @@ ENV PATH="/app/.venv/bin:$PATH"
 ENV HF_HOME=/home/appuser/.cache/huggingface
 ENV PYTHONUNBUFFERED=1
 
+# Preload ML models (reranker) during build to avoid download on first request
+# Модель зберігається в HF_HOME і включається в образ
+RUN mkdir -p /home/appuser/.cache/huggingface && \
+    chown -R appuser:appuser /home/appuser/.cache && \
+    python scripts/preload_models.py
+
 USER appuser
 
 # Healthcheck
