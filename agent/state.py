@@ -41,6 +41,7 @@ class AgentState(TypedDict):
 
     plan: str
     search_queries: List[str]
+    sources: List[str]
 
 
 def create_initial_state(
@@ -87,5 +88,6 @@ def create_initial_state(
         references=[],
         reasoning=None,
         plan="",
-        search_queries=[]
+        search_queries=[],
+        sources=[]
     )
