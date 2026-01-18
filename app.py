@@ -28,6 +28,11 @@ async def lifespan(app: FastAPI):
     # Setup LangSmith tracing
     # logger.info("Setting up LangSmith instrumentation...")
     try:
+        # phoenix_enabled = setup_phoenix_instrumentation()
+        # if phoenix_enabled:
+        #     logger.info("✓ Phoenix instrumentation enabled")
+        # else:
+        #     logger.info("ℹ Phoenix instrumentation disabled or unavailable")
         setup_langsmith()
         # logger.info("✓ LangSmith instrumentation enabled")
     except Exception as e:

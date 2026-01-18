@@ -87,7 +87,7 @@ async def react_simple_node(state: AgentState) -> Dict[str, Any]:
     await qdrant.initialize()
     
     # Get initial context
-    retrieved_context = state.get("retrieved_context", [])
+    retrieved_context = state.get("actualized_context", [])
     message_text = state["message_text"]
     
     # Format initial context
@@ -114,11 +114,9 @@ async def react_simple_node(state: AgentState) -> Dict[str, Any]:
     tools = [search_tool]
     
     # Create system prompt
-    system_prompt = f"""Ти асистент, який відповідає на запитання користувача.
-
+    system_prompt = f"""Ти асистент, який відповідає на запитання користувача, вирішує поставлені задачі або завдання базуючись на наданому(або отриманому через тулзи) контексті.
 🚫 TABULA RASA: У тебе НУЛЬОВІ знання про предметну область.
 Використовуй ТІЛЬКИ інформацію з контексту нижче або з пошуку. НЕ використовуй pretrained knowledge.
-
 ПОЧАТКОВИЙ КОНТЕКСТ:
 {context_text or "(порожньо)"}
 

@@ -60,5 +60,6 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
 
 EXPOSE 3000
 
-# Запуск через uvicorn (он уже есть в .venv/bin, который в PATH)
-CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "3000", "--workers", "1"]
+# Запуск через Python entrypoint для автоматического вычисления workers
+# Количество workers: (CPU cores × 2) + 1 (можно переопределить через ENV: WORKERS)
+CMD ["python", "start.py"]

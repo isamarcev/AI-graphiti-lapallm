@@ -2,20 +2,15 @@ import logging
 from langgraph.graph import StateGraph, END
 from langgraph.checkpoint.memory import MemorySaver
 
+from agent.nodes.context_answer import context_answer_node
 from agent.state import AgentState
 from agent.nodes.classify import orchestrator_node
 from agent.nodes.check_conflicts import check_conflicts_node
 from agent.nodes.query_analyzer import query_analyzer_node
 from agent.nodes.retrieve import retrieve_context_node
-from agent.nodes.react_simple import react_simple_node
 from agent.nodes.actualize import actualize_context_node
-from agent.nodes.react import react_loop_node
 from agent.nodes.generate_learn_response import generate_learn_response_node
 from agent.nodes.generate_solve_response import generate_solve_response_node
-from agent.nodes.validate import validate_response_node
-from agent.nodes.store_indexed import store_indexed_facts_node
-from agent.nodes.index_facts import index_facts_node
-from agent.nodes.context_answer import context_answer_node
 from agent.nodes.index_raw import index_raw_node
 from agent.nodes.actualize import actualize_context_node
 
@@ -89,8 +84,6 @@ def create_agent_graph():
     workflow.add_node("react_loop", context_answer_node)
     workflow.add_node("generate_solve_response", generate_solve_response_node)
     workflow.add_node("generate_learn_response", generate_learn_response_node)
-    workflow.add_node("store_indexed_facts", store_indexed_facts_node)
-    workflow.add_node("index_facts", index_facts_node)
     workflow.add_node("index_raw_facts", index_raw_node)
     workflow.add_node("actualize_context", actualize_context_node)
 

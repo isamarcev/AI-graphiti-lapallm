@@ -24,7 +24,11 @@ services:
       - ./db:/app/db
       # Mount .env for prompt updates without rebuild
       - ./.env:/app/.env
-    command: uvicorn app:app --host 0.0.0.0 --port 3000 --reload
+      # Mount start.py for quick updates
+      - ./start.py:/app/start.py
+    # Production mode: multi-workers (используется CMD из Dockerfile - start.py)
+    # Development mode: single worker с --reload (раскомментировать строку ниже)
+    # command: uvicorn app:app --host 0.0.0.0 --port 3000 --reload
     depends_on:
       qdrant:
         condition: service_started
