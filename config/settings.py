@@ -73,43 +73,6 @@ class Settings(BaseSettings):
         """Construct async SQLite URL for SQLAlchemy."""
         return f"sqlite+aiosqlite:///{self.database_path}"
 
-    # Graphiti Configuration
-    graphiti_temperature: float = Field(
-        default=0.0,
-        description="Temperature for Graphiti LLM (lower for more stable JSON generation)"
-    )
-    graphiti_max_episode_length: int = Field(
-        default=10000,
-        description="Maximum episode length for Graphiti"
-    )
-    graphiti_search_limit: int = Field(
-        default=10,
-        description="Number of results to retrieve from Graphiti search"
-    )
-    graphiti_relevance_threshold: float = Field(
-        default=0.7,
-        description="Minimum relevance score for retrieved memories"
-    )
-    graphiti_max_concurrent_llm: int = Field(
-        default=10,
-        description="Max concurrent LLM calls in Graphiti (for entity processing parallelization)"
-    )
-    graphiti_max_concurrent_embeddings: int = Field(
-        default=20,
-        description="Max concurrent embedding calls in Graphiti"
-    )
-
-    # Custom extraction instructions for Graphiti (helps with JSON generation)
-    graphiti_custom_instructions: str = Field(
-        default="""CRITICAL: You MUST return valid JSON.
-- Always close all strings with "
-- Always close all objects with }
-- Always close all arrays with ]
-- Double-check your JSON before responding.
-- Keep responses concise.""",
-        description="Custom instructions added to Graphiti extraction prompts for better JSON compliance"
-    )
-
     # Embeddings Configuration
     embedding_model_name: str = Field(
         default="text-embedding-qwen",

@@ -4,25 +4,25 @@ services:
   # ============================================
   # Phoenix - Observability та Tracing
   # ============================================
-  phoenix:
-    image: arizephoenix/phoenix:latest
-    container_name: graphiti-lapa-phoenix
-    ports:
-      - "6006:6006"  # Phoenix Web UI
-    environment:
-      - PHOENIX_PORT=6006
-      - PHOENIX_WORKING_DIR=/phoenix
-    volumes:
-      - phoenix_data:/phoenix
-    networks:
-      - graphiti-network
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:6006/healthz').read()"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 40s
+#  phoenix:
+#    image: arizephoenix/phoenix:latest
+#    container_name: graphiti-lapa-phoenix
+#    ports:
+#      - "6006:6006"  # Phoenix Web UI
+#    environment:
+#      - PHOENIX_PORT=6006
+#      - PHOENIX_WORKING_DIR=/phoenix
+#    volumes:
+#      - phoenix_data:/phoenix
+#    networks:
+#      - graphiti-network
+#    restart: unless-stopped
+#    healthcheck:
+#      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:6006/healthz').read()"]
+#      interval: 10s
+#      timeout: 5s
+#      retries: 5
+#      start_period: 40s
 
   # ============================================
   # Tabula Rasa Agent - Main Application
@@ -63,8 +63,8 @@ services:
     depends_on:
       qdrant:
         condition: service_started
-      phoenix:
-        condition: service_started
+#      phoenix:
+#        condition: service_started
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
       interval: 30s
@@ -94,8 +94,8 @@ services:
     restart: unless-stopped
 
 volumes:
-  phoenix_data:
-    driver: local
+#  phoenix_data:
+#    driver: local
   qdrant_data:
     driver: local
 

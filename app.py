@@ -21,11 +21,11 @@ async def lifespan(app: FastAPI):
     # Startup: Setup Phoenix observability
     logger.info("Setting up Phoenix instrumentation...")
     try:
-        phoenix_enabled = setup_phoenix_instrumentation()
-        if phoenix_enabled:
-            logger.info("✓ Phoenix instrumentation enabled")
-        else:
-            logger.info("ℹ Phoenix instrumentation disabled or unavailable")
+        # phoenix_enabled = setup_phoenix_instrumentation()
+        # if phoenix_enabled:
+        #     logger.info("✓ Phoenix instrumentation enabled")
+        # else:
+        #     logger.info("ℹ Phoenix instrumentation disabled or unavailable")
         setup_langsmith()
     except Exception as e:
         logger.warning(f"Phoenix setup warning: {e}")
